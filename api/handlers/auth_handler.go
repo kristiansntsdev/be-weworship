@@ -6,6 +6,22 @@ import (
 "github.com/gofiber/fiber/v2"
 )
 
+func (h *Handler) RegisterUser(c *fiber.Ctx) error {
+	var req struct {
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	data, status, err := h.auth.Register(req.Name, req.Email, req.Password)
+	if err != nil {
+		return utils.Fail(c, status, err.Error())
+	}
+	return utils.OK(c, status, "Account created successfully", data)
+}
+
 func (h *Handler) Login(c *fiber.Ctx) error {
 var req struct {
 Email    string `json:"email"`

@@ -33,6 +33,7 @@ return utils.OK(c, 200, "Welcome to WeWorship API", fiber.Map{"version": "3.0.0"
 api := app.Group("/api")
 
 // ── Public routes ──────────────────────────────────────────────────────
+api.Post("/auth/register", h.RegisterUser)
 api.Post("/auth/login", h.Login)
 api.Get("/auth/google", h.GoogleLogin)
 api.Get("/auth/google/callback", h.GoogleCallback)
