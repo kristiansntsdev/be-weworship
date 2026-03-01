@@ -19,15 +19,27 @@ rows, total, err := h.users.List(search, page, limit)
 if err != nil {
 return utils.Fail(c, 500, "Failed to retrieve users")
 }
+data := make([]fiber.Map, len(rows))
+for i, u := range rows {
+data[i] = fiber.Map{
+"id":        u.ID,
+"name":      u.Name,
+"email":     u.Email,
+"role":      u.Role,
+"provider":  u.Provider,
+"verified":  u.Verified,
+"status":    u.Status,
+"createdAt": u.CreatedAt,
+}
+}
 return c.JSON(fiber.Map{
 "code":    200,
 "message": "User list retrieved successfully",
-"data":    rows,
+"data":    data,
 "pagination": fiber.Map{
 "total": total,
 "page":  page,
 "limit": limit,
 },
-"search": search,
 })
 }

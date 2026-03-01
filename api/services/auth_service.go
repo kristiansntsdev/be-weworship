@@ -115,6 +115,38 @@ return s.google.ClientURL + "/auth/v2/login?error=" + errKey
 return "/?error=" + errKey
 }
 
+// Register creates a new local email+password account and returns a JWT.
+func (s *AuthService) Register(name, email, password string) (map[string]any, int, error) {
+	name = strings.TrimSpace(name)
+	email = strings.TrimSpace(email)
+	if name == "" || email == "" || password == "" {
+		return nil, 400, fmt.Errorf("name, email and password are required")
+	}
+	if len(password) < 6 {
+		return nil, 400, fmt.Errorf("password must be at least 6 characters")
+	}
+	existing, err := s.repo.FindByEmail(email)
+	if err != nil {
+		return nil, 500, err
+	}
+	if existing != nil {
+		return nil, 409, fmt.Errorf("an account with that email already exists")
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, 500, fmt.Errorf("failed to hash password")
+	}
+	u, err := s.repo.CreateLocal(name, email, string(hashed))
+	if err != nil {
+		return nil, 500, err
+	}
+	token, err := s.issueToken(u)
+	if err != nil {
+		return nil, 500, err
+	}
+	return map[string]any{"token": token, "user": mapUser(*u)}, 201, nil
+}
+
 // Login authenticates a user by email + password.
 func (s *AuthService) Login(email, password string) (map[string]any, int, error) {
 email = strings.TrimSpace(email)
