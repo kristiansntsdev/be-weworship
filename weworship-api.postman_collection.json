@@ -988,7 +988,7 @@
                 }
               ]
             },
-            "description": "Daily/monthly active user counts derived from `app_sessions` table."
+            "description": "Returns scalar user stats.\n\n**Response data:** `{ total_users: number, dau: number, mau: number }`\n- `total_users` \u2014 all-time registered users count\n- `dau` \u2014 distinct users with a session today\n- `mau` \u2014 distinct users with a session in the last 30 days"
           }
         },
         {

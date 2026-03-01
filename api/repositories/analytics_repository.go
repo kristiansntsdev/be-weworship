@@ -47,7 +47,7 @@ rows := []TopSongRow{}
 err := r.db.Select(&rows, r.db.Rebind(`
 SELECT song_id, event_type, COUNT(*) as count
 FROM song_events
-WHERE song_id IS NOT NULL AND "createdAt" >= NOW() - (? || ' days')::interval
+WHERE song_id IS NOT NULL AND "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY song_id, event_type
 ORDER BY count DESC
 LIMIT ?`), days, limit)
@@ -64,7 +64,7 @@ rows := []DailyCountRow{}
 err := r.db.Select(&rows, r.db.Rebind(`
 SELECT DATE("createdAt")::text as date, COUNT(*) as count
 FROM users
-WHERE "createdAt" >= NOW() - (? || ' days')::interval
+WHERE "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY DATE("createdAt")
 ORDER BY date ASC`), days)
 return rows, err
@@ -75,7 +75,7 @@ rows := []DailyCountRow{}
 err := r.db.Select(&rows, r.db.Rebind(`
 SELECT DATE("createdAt")::text as date, COUNT(DISTINCT user_id) as count
 FROM app_sessions
-WHERE user_id IS NOT NULL AND "createdAt" >= NOW() - (? || ' days')::interval
+WHERE user_id IS NOT NULL AND "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY DATE("createdAt")
 ORDER BY date ASC`), days)
 return rows, err
@@ -96,7 +96,7 @@ SELECT query,
        ROUND(AVG(results_count))::int as avg_results,
        SUM(CASE WHEN results_count = 0 THEN 1 ELSE 0 END) as zero_results
 FROM search_logs
-WHERE "createdAt" >= NOW() - (? || ' days')::interval
+WHERE "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY query
 ORDER BY count DESC
 LIMIT ?`), days, limit)
@@ -113,7 +113,7 @@ rows := []PlatformBreakdownRow{}
 err := r.db.Select(&rows, r.db.Rebind(`
 SELECT platform, COUNT(*) as count
 FROM app_sessions
-WHERE "createdAt" >= NOW() - (? || ' days')::interval
+WHERE "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY platform
 ORDER BY count DESC`), days)
 return rows, err
@@ -138,10 +138,28 @@ SELECT metric_type, endpoint, screen_name,
        ROUND(AVG(duration_ms))::int as avg,
        COUNT(*) as count
 FROM performance_logs
-WHERE "createdAt" >= NOW() - (? || ' days')::interval
+WHERE "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY metric_type, endpoint, screen_name
 ORDER BY p95 DESC`), days)
 return rows, err
+}
+
+func (r *AnalyticsRepository) TotalUsers() (int, error) {
+var count int
+err := r.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count)
+return count, err
+}
+
+func (r *AnalyticsRepository) DAUToday() (int, error) {
+var count int
+err := r.db.QueryRow(`SELECT COUNT(DISTINCT user_id) FROM app_sessions WHERE user_id IS NOT NULL AND DATE("createdAt") = CURRENT_DATE`).Scan(&count)
+return count, err
+}
+
+func (r *AnalyticsRepository) MAU() (int, error) {
+var count int
+err := r.db.QueryRow(r.db.Rebind(`SELECT COUNT(DISTINCT user_id) FROM app_sessions WHERE user_id IS NOT NULL AND "createdAt" >= NOW() - 30 * INTERVAL '1 day'`)).Scan(&count)
+return count, err
 }
 
 func nullStr(s string) *string {
