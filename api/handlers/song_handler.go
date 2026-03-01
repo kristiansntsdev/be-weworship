@@ -35,7 +35,19 @@ func (h *Handler) GetSongs(c *fiber.Ctx) error {
 	if limit > 1000 {
 		limit = 1000
 	}
-	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")))
+	var hasLink *bool
+	if v := c.Query("has_link"); v == "true" {
+		t := true; hasLink = &t
+	} else if v == "false" {
+		f := false; hasLink = &f
+	}
+	var chordPro *bool
+	if v := c.Query("chordpro"); v == "true" {
+		t := true; chordPro = &t
+	} else if v == "false" {
+		f := false; chordPro = &f
+	}
+	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), hasLink, chordPro)
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to retrieve songs")
 	}

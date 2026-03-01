@@ -17,18 +17,18 @@ func NewSongRepository(db *sqlx.DB) *SongRepository {
 	return &SongRepository{db: db}
 }
 
-func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int) ([]models.Song, int, error) {
+func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool) ([]models.Song, int, error) {
 	offset := (page - 1) * limit
 	where := []string{"1=1"}
 	args := []any{}
 
 	if strings.TrimSpace(search) != "" {
-		where = append(where, `(s.title LIKE ? OR s.artist LIKE ? OR s.lyrics_and_chords LIKE ?)`)
+		where = append(where, `(s.title ILIKE ? OR s.artist ILIKE ? OR s.lyrics_and_chords ILIKE ?)`)
 		like := "%" + strings.TrimSpace(search) + "%"
 		args = append(args, like, like, like)
 	}
 	if strings.TrimSpace(baseChord) != "" {
-		where = append(where, `s.base_chord LIKE ?`)
+		where = append(where, `s.base_chord ILIKE ?`)
 		args = append(args, "%"+strings.TrimSpace(baseChord)+"%")
 	}
 	if len(tagIDs) > 0 {
@@ -36,6 +36,20 @@ func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOr
 		where = append(where, `s.id IN (SELECT DISTINCT song_id FROM song_tags WHERE tag_id IN (`+ph+`))`)
 		for _, id := range tagIDs {
 			args = append(args, id)
+		}
+	}
+	if hasLink != nil {
+		if *hasLink {
+			where = append(where, `(s.external_links IS NOT NULL AND s.external_links::text NOT IN ('', 'null', '{}'))`)
+		} else {
+			where = append(where, `(s.external_links IS NULL OR s.external_links::text IN ('', 'null', '{}'))`)
+		}
+	}
+	if chordPro != nil {
+		if *chordPro {
+			where = append(where, `(s.lyrics_and_chords LIKE '%[%' AND s.lyrics_and_chords NOT LIKE '%<span%')`)
+		} else {
+			where = append(where, `(s.lyrics_and_chords IS NULL OR s.lyrics_and_chords NOT LIKE '%[%' OR s.lyrics_and_chords LIKE '%<span%')`)
 		}
 	}
 
