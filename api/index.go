@@ -70,9 +70,11 @@ func buildApp() (*fiber.App, error) {
 	teamSvc := services.NewTeamService(teamRepo, authRepo, playlistRepo)
 	userSvc := services.NewUserService(userRepo)
 	analyticsSvc := services.NewAnalyticsService(analyticsRepo)
+	auditRepo := repositories.NewAuditRepository(ctx.DB)
+	auditSvc := services.NewAuditService(auditRepo)
 
 	authMW := middleware.NewAuthMiddleware(authSvc)
-	h := handlers.NewHandler(authMW, authSvc, songSvc, tagSvc, playlistSvc, teamSvc, userSvc, analyticsSvc)
+	h := handlers.NewHandler(authMW, authSvc, songSvc, tagSvc, playlistSvc, teamSvc, userSvc, analyticsSvc, auditSvc)
 
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	app.Use(cors.New(cors.Config{

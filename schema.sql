@@ -136,3 +136,19 @@ CREATE INDEX IF NOT EXISTS idx_search_logs_created      ON search_logs("createdA
 CREATE INDEX IF NOT EXISTS idx_app_sessions_created     ON app_sessions("createdAt");
 CREATE INDEX IF NOT EXISTS idx_perf_logs_metric_type    ON performance_logs(metric_type);
 CREATE INDEX IF NOT EXISTS idx_perf_logs_created        ON performance_logs("createdAt");
+
+-- ── Audit Log ──────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id           SERIAL PRIMARY KEY,
+    user_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    user_name    VARCHAR(255) NOT NULL DEFAULT '',   -- denormalised snapshot
+    user_email   VARCHAR(255) NOT NULL DEFAULT '',
+    action       VARCHAR(20)  NOT NULL,              -- 'create' | 'update' | 'delete'
+    entity_type  VARCHAR(50)  NOT NULL,              -- 'song' | 'user' | 'tag'
+    entity_id    INTEGER,
+    entity_name  TEXT,                               -- title / email at time of action
+    changes      JSONB,                              -- { field: { from, to } } or full snapshot
+    "createdAt"  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs ("createdAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity  ON audit_logs (entity_type, entity_id);
