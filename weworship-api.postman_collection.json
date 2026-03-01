@@ -1,23 +1,39 @@
 {
   "info": {
     "name": "WeWorship API v3",
-    "description": "Public API for WeWorship — songs, playlists, teams, auth, and analytics.\n\n**Base URL:** `http://localhost:3001` (local) or your Vercel deployment URL.\n\n**Auth:** Login first → token is auto-saved to `{{token}}` variable → all authenticated requests use it automatically.\n\n**Roles:** `user` (default) | `admin` (required for song CRUD and analytics reads)",
+    "description": "Public API for WeWorship \u2014 songs, playlists, teams, auth, and analytics.\n\n**Base URL:** `http://localhost:3001` (local) or your Vercel deployment URL.\n\n**Auth:** Login first \u2192 token is auto-saved to `{{token}}` variable \u2192 all authenticated requests use it automatically.\n\n**Roles:** `user` (default) | `admin` (required for song CRUD and analytics reads)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:3001", "type": "string" },
-    { "key": "token",    "value": "",                      "type": "string" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
-      "name": "🌐 Public",
+      "name": "\ud83c\udf10 Public",
       "item": [
         {
           "name": "Health check",
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
             "description": "Returns API version and welcome message."
           }
         },
@@ -26,7 +42,16 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/api/home", "host": ["{{base_url}}"], "path": ["api", "home"] },
+            "url": {
+              "raw": "{{base_url}}/api/home",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "home"
+              ]
+            },
             "description": "Returns aggregated counts for the Library screen.\n\n**Response:**\n```json\n{\n  \"song_count\": 120,\n  \"artist_count\": 35\n}\n```"
           }
         },
@@ -35,7 +60,16 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/api/artists", "host": ["{{base_url}}"], "path": ["api", "artists"] },
+            "url": {
+              "raw": "{{base_url}}/api/artists",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "artists"
+              ]
+            },
             "description": "Returns all unique artists derived from song data, sorted alphabetically.\n\n**Response:**\n```json\n[\n  { \"id\": \"hillsong-worship\", \"name\": \"Hillsong Worship\", \"count\": 12 },\n  { \"id\": \"elevation-worship\", \"name\": \"Elevation Worship\", \"count\": 8 }\n]\n```\n\n`id` is a URL-safe slug of the artist name. `count` is the number of songs by that artist."
           }
         },
@@ -45,20 +79,63 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/songs?page=1&limit=20&search=&base_chord=&sortBy=createdAt&sortOrder=DESC&tag_ids=",
-              "host": ["{{base_url}}"],
-              "path": ["api", "songs"],
+              "raw": "{{base_url}}/api/songs?page=1&limit=20&search=&base_chord=&sortBy=createdAt&sortOrder=DESC&tag_ids=&has_link=&chordpro=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "songs"
+              ],
               "query": [
-                { "key": "page",       "value": "1",         "description": "Page number (default: 1)" },
-                { "key": "limit",      "value": "20",        "description": "Items per page, max 1000 (default: all)" },
-                { "key": "search",     "value": "",          "description": "Full-text search on title, artist, lyrics" },
-                { "key": "base_chord", "value": "",          "description": "Filter by base chord e.g. C, G, Am" },
-                { "key": "sortBy",     "value": "createdAt", "description": "createdAt | updatedAt | title" },
-                { "key": "sortOrder",  "value": "DESC",      "description": "ASC | DESC" },
-                { "key": "tag_ids",    "value": "",          "description": "Comma-separated tag IDs e.g. 1,2,3" }
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page, max 1000 (default: all)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Full-text search on title, artist, lyrics"
+                },
+                {
+                  "key": "base_chord",
+                  "value": "",
+                  "description": "Filter by base chord e.g. C, G, Am"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "createdAt | updatedAt | title"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "DESC",
+                  "description": "ASC | DESC"
+                },
+                {
+                  "key": "tag_ids",
+                  "value": "",
+                  "description": "Comma-separated tag IDs e.g. 1,2,3"
+                },
+                {
+                  "key": "has_link",
+                  "value": "",
+                  "description": "Filter by external link presence: true = has at least one link, false = no links, omit = all"
+                },
+                {
+                  "key": "chordpro",
+                  "value": "",
+                  "description": "Filter by ChordPro format: true = lyrics in [chord] format, false = not yet converted (HTML or plain), omit = all"
+                }
               ]
             },
-            "description": "Paginated song list with optional filtering.\n\n**Response includes:** `id`, `slug`, `title`, `artist[]`, `base_chord`, `lyrics_and_chords`, `external_links`, `dmca_takedown`, `dmca_status_notes`, `tags[]`, `createdAt`, `updatedAt`"
+            "description": "Paginated song list with optional filtering. Search is case-insensitive (ILIKE).\n\n**Query params:**\n- `search` \u2014 case-insensitive match on title, artist, lyrics\n- `base_chord` \u2014 case-insensitive partial match on key\n- `has_link=true|false` \u2014 filter by whether `external_links` has at least one entry\n- `chordpro=true|false` \u2014 filter by whether lyrics use ChordPro `[chord]` format\n- `tag_ids` \u2014 comma-separated tag IDs\n- `sortBy` \u2014 `createdAt` | `updatedAt` | `title`\n- `sortOrder` \u2014 `ASC` | `DESC`\n\n**Response includes:** `id`, `slug`, `title`, `artist`, `base_chord`, `lyrics_and_chords`, `external_links`, `dmca_takedown`, `dmca_status_notes`, `tags[]`, `createdAt`, `updatedAt`"
           }
         },
         {
@@ -68,8 +145,14 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/songs/amazing-grace-1",
-              "host": ["{{base_url}}"],
-              "path": ["api", "songs", "amazing-grace-1"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "songs",
+                "amazing-grace-1"
+              ]
             },
             "description": "Fetch a single song.\n\n**Accepts either:**\n- Numeric ID: `GET /api/songs/1`\n- Slug: `GET /api/songs/amazing-grace-1`\n\nSlugs follow the pattern `{title-slug}-{id}` e.g. `amazing-grace-1`.\n\n**Response:**\n```json\n{\n  \"id\": 1,\n  \"slug\": \"amazing-grace-1\",\n  \"title\": \"Amazing Grace\",\n  \"artist\": [\"Traditional\"],\n  \"base_chord\": \"G\",\n  \"lyrics_and_chords\": \"[G]Amazing [C]grace...\",\n  \"external_links\": \"{\\\"spotify\\\":\\\"https://...\\\",\\\"youtube\\\":\\\"https://...\\\"}\",\n  \"dmca_takedown\": false,\n  \"dmca_status_notes\": null,\n  \"tags\": [{\"id\": 1, \"name\": \"worship\"}],\n  \"createdAt\": \"2025-01-01T00:00:00Z\",\n  \"updatedAt\": \"2025-01-01T00:00:00Z\"\n}\n```"
           }
@@ -81,9 +164,20 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/tags?search=",
-              "host": ["{{base_url}}"],
-              "path": ["api", "tags"],
-              "query": [{ "key": "search", "value": "", "description": "Optional name filter" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tags"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Optional name filter"
+                }
+              ]
             },
             "description": "Returns all tags. Optionally filter by name."
           }
@@ -92,15 +186,26 @@
           "name": "Get or create tag",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"worship\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/tags/get-or-create",
-              "host": ["{{base_url}}"],
-              "path": ["api", "tags", "get-or-create"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tags",
+                "get-or-create"
+              ]
             },
             "description": "Finds existing tag by name or creates a new one. Returns `{ tag, created: bool }`."
           }
@@ -108,7 +213,7 @@
       ]
     },
     {
-      "name": "🔐 Auth",
+      "name": "\ud83d\udd10 Auth",
       "item": [
         {
           "name": "Login",
@@ -129,42 +234,76 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"secret\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/auth/login",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "login"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
             },
             "description": "Email + password login. JWT token is automatically saved to `{{token}}` collection variable on success.\n\n**Response:**\n```json\n{\n  \"data\": {\n    \"token\": \"eyJ...\",\n    \"user\": { \"id\": 1, \"name\": \"Admin\", \"email\": \"admin@example.com\", \"role\": \"admin\" }\n  }\n}\n```"
           }
         },
         {
-          "name": "Google OAuth — redirect (web)",
+          "name": "Google OAuth \u2014 redirect (web)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/auth/google?client=web",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "google"],
-              "query": [{ "key": "client", "value": "web", "description": "web | mobile" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "google"
+              ],
+              "query": [
+                {
+                  "key": "client",
+                  "value": "web",
+                  "description": "web | mobile"
+                }
+              ]
             },
-            "description": "Redirects browser to Google's OAuth consent screen.\n\n- `client=web` → redirects to `CLIENT_URL` after auth\n- `client=mobile` → redirects to `MOBILE_SCHEME://` deep link"
+            "description": "Redirects browser to Google's OAuth consent screen.\n\n- `client=web` \u2192 redirects to `CLIENT_URL` after auth\n- `client=mobile` \u2192 redirects to `MOBILE_SCHEME://` deep link"
           }
         },
         {
           "name": "Logout",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/auth/logout",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "logout"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
             },
             "description": "Invalidates session. Client should discard token."
           }
@@ -173,11 +312,22 @@
           "name": "Get current user (me)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/auth/me",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "me"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
             },
             "description": "Returns the authenticated user's profile from the JWT claims.\n\n**Response:**\n```json\n{\n  \"user\": { \"id\": 1, \"name\": \"John\", \"email\": \"john@example.com\", \"role\": \"user\" }\n}\n```"
           }
@@ -186,12 +336,29 @@
           "name": "Check permission",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/auth/check-permission?role=admin",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "check-permission"],
-              "query": [{ "key": "role", "value": "admin", "description": "user | admin — omit to just verify token is valid" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "check-permission"
+              ],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "admin",
+                  "description": "user | admin \u2014 omit to just verify token is valid"
+                }
+              ]
             },
             "description": "Checks if the authenticated user has a specific role. Returns 403 if role doesn't match.\n\n**Response:**\n```json\n{\n  \"hasPermission\": true,\n  \"role\": \"admin\",\n  \"isAdmin\": true\n}\n```"
           }
@@ -199,15 +366,21 @@
       ]
     },
     {
-      "name": "🎵 Playlists",
+      "name": "\ud83c\udfb5 Playlists",
       "item": [
         {
           "name": "Create playlist",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type",  "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -215,8 +388,13 @@
             },
             "url": {
               "raw": "{{base_url}}/api/playlists",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists"
+              ]
             },
             "description": "`songs` is an optional array of song IDs to pre-populate. Returns the created playlist."
           }
@@ -225,14 +403,30 @@
           "name": "Get my playlists",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlists?page=1&limit=10",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists"
+              ],
               "query": [
-                { "key": "page",  "value": "1" },
-                { "key": "limit", "value": "10" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
               ]
             },
             "description": "Returns playlists owned by or shared with the authenticated user."
@@ -242,11 +436,22 @@
           "name": "Get playlist by ID",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlists/1",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists", "1"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists",
+                "1"
+              ]
             },
             "description": "Access is allowed for the playlist owner and team members."
           }
@@ -256,8 +461,14 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type",  "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -265,8 +476,14 @@
             },
             "url": {
               "raw": "{{base_url}}/api/playlists/1",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists", "1"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists",
+                "1"
+              ]
             },
             "description": "Only the playlist owner can rename."
           }
@@ -275,11 +492,22 @@
           "name": "Delete playlist",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlists/1",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists", "1"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists",
+                "1"
+              ]
             },
             "description": "Only the playlist owner can delete."
           }
@@ -288,11 +516,23 @@
           "name": "Generate sharelink",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlists/1/sharelink",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists", "1", "sharelink"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists",
+                "1",
+                "sharelink"
+              ]
             },
             "description": "Generates a unique share token for the playlist. Returns `{ share_token, sharable_link }`."
           }
@@ -301,11 +541,23 @@
           "name": "Join playlist via share token",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlists/join/SHARE_TOKEN_HERE",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists", "join", "SHARE_TOKEN_HERE"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists",
+                "join",
+                "SHARE_TOKEN_HERE"
+              ]
             },
             "description": "Join a playlist team using the share token from a sharelink."
           }
@@ -315,8 +567,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type",  "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -324,8 +582,15 @@
             },
             "url": {
               "raw": "{{base_url}}/api/playlists/1/songs",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists", "1", "songs"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists",
+                "1",
+                "songs"
+              ]
             }
           }
         },
@@ -334,8 +599,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type",  "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -343,8 +614,16 @@
             },
             "url": {
               "raw": "{{base_url}}/api/playlists/1/songs/4",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists", "1", "songs", "4"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists",
+                "1",
+                "songs",
+                "4"
+              ]
             },
             "description": "Add a specific song to a playlist with a custom base chord (overrides the song's default)."
           }
@@ -353,28 +632,51 @@
           "name": "Remove song from playlist",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlists/1/song/4",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlists", "1", "song", "4"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlists",
+                "1",
+                "song",
+                "4"
+              ]
             }
           }
         }
       ]
     },
     {
-      "name": "👥 Playlist Teams",
+      "name": "\ud83d\udc65 Playlist Teams",
       "item": [
         {
           "name": "Get my teams",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlist-teams",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlist-teams"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlist-teams"
+              ]
             },
             "description": "Returns teams where the authenticated user is the lead."
           }
@@ -383,11 +685,22 @@
           "name": "Get team by ID",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlist-teams/1",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlist-teams", "1"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlist-teams",
+                "1"
+              ]
             }
           }
         },
@@ -395,11 +708,24 @@
           "name": "Remove member from team",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlist-teams/1/members/2",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlist-teams", "1", "members", "2"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlist-teams",
+                "1",
+                "members",
+                "2"
+              ]
             },
             "description": "Only the team lead can remove members. `:id` = team ID, `2` = user ID to remove."
           }
@@ -408,11 +734,23 @@
           "name": "Leave team",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlist-teams/1/leave",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlist-teams", "1", "leave"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlist-teams",
+                "1",
+                "leave"
+              ]
             },
             "description": "Current user leaves the team. The lead cannot leave their own team (use Delete instead)."
           }
@@ -421,11 +759,22 @@
           "name": "Delete team",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/playlist-teams/1",
-              "host": ["{{base_url}}"],
-              "path": ["api", "playlist-teams", "1"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "playlist-teams",
+                "1"
+              ]
             },
             "description": "Only the team lead can delete the team."
           }
@@ -433,15 +782,21 @@
       ]
     },
     {
-      "name": "🛡️ Admin — Songs",
+      "name": "\ud83d\udee1\ufe0f Admin \u2014 Songs",
       "item": [
         {
           "name": "Create song",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type",  "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -449,8 +804,14 @@
             },
             "url": {
               "raw": "{{base_url}}/api/admin/songs",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "songs"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "songs"
+              ]
             },
             "description": "**Required:** `title`, `artist`\n\n**Fields:**\n- `artist`: string or array of strings\n- `external_links`: JSON string `{\"spotify\": \"url\", \"youtube\": \"url\"}`\n- `dmca_takedown`: boolean (default: false)\n- `dmca_status_notes`: free text for DMCA claim notes\n- `tag_names`: auto-creates tags if they don't exist\n\n**Slug** is auto-generated as `{title-slug}-{id}` e.g. `amazing-grace-1`"
           }
@@ -460,8 +821,14 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type",  "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -469,42 +836,82 @@
             },
             "url": {
               "raw": "{{base_url}}/api/admin/songs/1",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "songs", "1"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "songs",
+                "1"
+              ]
             },
-            "description": "All fields are optional — only provided fields are updated.\n\n**Note:** Including `tag_names` in the body replaces all existing tags. Omitting `tag_names` entirely leaves tags unchanged."
+            "description": "All fields are optional \u2014 only provided fields are updated.\n\n**Note:** Including `tag_names` in the body replaces all existing tags. Omitting `tag_names` entirely leaves tags unchanged."
           }
         },
         {
           "name": "Delete song",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/admin/songs/1",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "songs", "1"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "songs",
+                "1"
+              ]
             }
           }
         }
       ]
     },
     {
-      "name": "🛡️ Admin — Users",
+      "name": "\ud83d\udee1\ufe0f Admin \u2014 Users",
       "item": [
         {
           "name": "Get users",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/admin/users?page=1&limit=20&search=",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "users"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users"
+              ],
               "query": [
-                { "key": "page",   "value": "1" },
-                { "key": "limit",  "value": "20" },
-                { "key": "search", "value": "", "description": "Filter by name or email" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Filter by name or email"
+                }
               ]
             },
             "description": "Paginated user list. Response includes `{ data[], pagination: { total, page, limit } }`."
@@ -513,21 +920,41 @@
       ]
     },
     {
-      "name": "🛡️ Admin — Analytics",
+      "name": "\ud83d\udee1\ufe0f Admin \u2014 Analytics",
       "description": "All analytics endpoints require `role: admin`. Use `days` param to control the lookback window.",
       "item": [
         {
           "name": "Top songs",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/admin/analytics/songs?days=30&limit=20",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "analytics", "songs"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "analytics",
+                "songs"
+              ],
               "query": [
-                { "key": "days",  "value": "30",  "description": "Lookback window in days" },
-                { "key": "limit", "value": "20",  "description": "Number of top songs to return" }
+                {
+                  "key": "days",
+                  "value": "30",
+                  "description": "Lookback window in days"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of top songs to return"
+                }
               ]
             },
             "description": "Most played songs in the given period with play counts."
@@ -537,12 +964,29 @@
           "name": "User stats (DAU / MAU)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/admin/analytics/users?days=30",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "analytics", "users"],
-              "query": [{ "key": "days", "value": "30" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "analytics",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30"
+                }
+              ]
             },
             "description": "Daily/monthly active user counts derived from `app_sessions` table."
           }
@@ -551,14 +995,32 @@
           "name": "Top searches",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/admin/analytics/searches?days=30&limit=20",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "analytics", "searches"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "analytics",
+                "searches"
+              ],
               "query": [
-                { "key": "days",  "value": "30" },
-                { "key": "limit", "value": "20" }
+                {
+                  "key": "days",
+                  "value": "30"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
               ]
             },
             "description": "Most frequent search queries with counts."
@@ -568,12 +1030,29 @@
           "name": "Sessions by platform",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/admin/analytics/sessions?days=30",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "analytics", "sessions"],
-              "query": [{ "key": "days", "value": "30" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "analytics",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30"
+                }
+              ]
             },
             "description": "Session breakdown by platform (ios / android / web) and app version."
           }
@@ -582,12 +1061,29 @@
           "name": "Performance summary (p50 / p95)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/admin/analytics/performance?days=7",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "analytics", "performance"],
-              "query": [{ "key": "days", "value": "7" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "analytics",
+                "performance"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "7"
+                }
+              ]
             },
             "description": "p50/p95 latency per metric type (`screen_load`, `song_load`, `api_response`). Computed via PostgreSQL `PERCENTILE_CONT`."
           }
@@ -595,7 +1091,7 @@
       ]
     },
     {
-      "name": "📊 Analytics — Mobile write",
+      "name": "\ud83d\udcca Analytics \u2014 Mobile write",
       "description": "Called by the mobile app. No auth required, but include `Authorization` header if user is logged in so events are associated with their account.",
       "item": [
         {
@@ -603,8 +1099,15 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}", "description": "Optional — associate event with user" },
-              { "key": "Content-Type",  "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "Optional \u2014 associate event with user"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -612,10 +1115,16 @@
             },
             "url": {
               "raw": "{{base_url}}/api/analytics/performance",
-              "host": ["{{base_url}}"],
-              "path": ["api", "analytics", "performance"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "analytics",
+                "performance"
+              ]
             },
-            "description": "Record a client-side performance metric.\n\n**`metric_type` values:**\n- `screen_load` — screen render time\n- `song_load` — time to load song chords\n- `api_response` — (auto-recorded by BE middleware)\n\n**Required:** `metric_type`, `duration_ms` (> 0)"
+            "description": "Record a client-side performance metric.\n\n**`metric_type` values:**\n- `screen_load` \u2014 screen render time\n- `song_load` \u2014 time to load song chords\n- `api_response` \u2014 (auto-recorded by BE middleware)\n\n**Required:** `metric_type`, `duration_ms` (> 0)"
           }
         },
         {
@@ -623,8 +1132,15 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}", "description": "Optional" },
-              { "key": "Content-Type",  "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "Optional"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -632,8 +1148,14 @@
             },
             "url": {
               "raw": "{{base_url}}/api/analytics/session",
-              "host": ["{{base_url}}"],
-              "path": ["api", "analytics", "session"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "analytics",
+                "session"
+              ]
             },
             "description": "Call once on each app open. Used to compute DAU/MAU in the admin dashboard."
           }

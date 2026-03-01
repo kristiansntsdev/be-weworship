@@ -66,7 +66,7 @@ func (s *SongService) HomeStats() (map[string]any, error) {
 	}, nil
 }
 
-func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int) ([]map[string]any, map[string]any, error) {
+func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool) ([]map[string]any, map[string]any, error) {
 	cacheKey := buildSongsCacheKey(page, limit, search, baseChord, sortBy, sortOrder, tagIDs)
 	if s.cache != nil && s.cache.Enabled() {
 		var cached struct {
@@ -91,7 +91,7 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 		sortOrder = "DESC"
 	}
 
-	rows, total, err := s.songs.List(page, limit, search, baseChord, mappedSort, strings.ToUpper(sortOrder), tagIDs)
+	rows, total, err := s.songs.List(page, limit, search, baseChord, mappedSort, strings.ToUpper(sortOrder), tagIDs, hasLink, chordPro)
 	if err != nil {
 		return nil, nil, err
 	}
