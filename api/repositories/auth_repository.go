@@ -16,46 +16,33 @@ func NewAuthRepository(db *sqlx.DB) *AuthRepository {
 	return &AuthRepository{db: db}
 }
 
-func (r *AuthRepository) FindPengurusByUsername(username string) (*models.Pengurus, error) {
-	var p models.Pengurus
-	err := r.db.Get(&p, `SELECT id_pengurus,nama,username,password,leveladmin,nowa,kotalevelup FROM pengurus WHERE username=? LIMIT 1`, username)
+func (r *AuthRepository) FindByEmail(email string) (*models.User, error) {
+	var u models.User
+	err := r.db.Get(&u, r.db.Rebind(`SELECT id,name,email,password,avatar_url,role,provider,provider_id,verified,status,"createdAt","updatedAt" FROM users WHERE email=? LIMIT 1`), email)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &p, nil
+	return &u, nil
 }
 
-func (r *AuthRepository) FindPesertaByEmail(email string) (*models.Peserta, error) {
-	var p models.Peserta
-	err := r.db.Get(&p, `SELECT id_peserta,nama,email,password,usercode,userlevel,verifikasi,status,role FROM peserta WHERE email=? LIMIT 1`, email)
+func (r *AuthRepository) FindByID(id int) (*models.UserBasic, error) {
+	var u models.UserBasic
+	err := r.db.Get(&u, r.db.Rebind(`SELECT id,name,email FROM users WHERE id=?`), id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &p, nil
+	return &u, nil
 }
 
-func (r *AuthRepository) FindPesertaBasicByID(id int) (*models.PesertaBasic, error) {
-	var p models.PesertaBasic
-	err := r.db.Get(&p, `SELECT id_peserta,nama,email FROM peserta WHERE id_peserta=?`, id)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
-}
-
-// FindOrCreateGoogleUser looks up a peserta by email and creates one if not found.
-// Google-created accounts are auto-verified (verifikasi=1) with userlevel=3.
-func (r *AuthRepository) FindOrCreateGoogleUser(email, name string) (*models.Peserta, error) {
-	existing, err := r.FindPesertaByEmail(email)
+// FindOrCreateGoogleUser upserts a user authenticated via Google OAuth.
+func (r *AuthRepository) FindOrCreateGoogleUser(email, name, providerID string) (*models.User, error) {
+	existing, err := r.FindByEmail(email)
 	if err != nil {
 		return nil, err
 	}
@@ -63,17 +50,28 @@ func (r *AuthRepository) FindOrCreateGoogleUser(email, name string) (*models.Pes
 		return existing, nil
 	}
 
-	userCode := uuid.NewString()[:8]
-	randomPassword := uuid.NewString() // Google users never log in with a password
-
 	_, err = r.db.Exec(
-		`INSERT INTO peserta (nama, email, password, usercode, userlevel, verifikasi, status, role)
-		 VALUES (?, ?, ?, ?, '3', '1', 'active', 'member')`,
-		name, email, randomPassword, userCode,
+		r.db.Rebind(`INSERT INTO users (name, email, role, provider, provider_id, verified, status)
+		 VALUES (?, ?, 'user', 'google', ?, TRUE, 'active')`),
+		name, email, providerID,
 	)
 	if err != nil {
 		return nil, err
 	}
+	return r.FindByEmail(email)
+}
 
-	return r.FindPesertaByEmail(email)
+// CreateLocal registers a new local (email+password) user. Password must already be hashed.
+func (r *AuthRepository) CreateLocal(name, email, hashedPassword string) (*models.User, error) {
+	userCode := uuid.NewString()[:8]
+	_ = userCode // kept for potential future use
+	_, err := r.db.Exec(
+		r.db.Rebind(`INSERT INTO users (name, email, password, role, provider, verified, status)
+		 VALUES (?, ?, ?, 'user', 'local', FALSE, 'active')`),
+		name, email, hashedPassword,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return r.FindByEmail(email)
 }

@@ -19,7 +19,7 @@ type Context struct {
 func NewContext() (*Context, error) {
 	dsn := buildDSN()
 
-	db, err := sqlx.Open("mysql", dsn)
+	db, err := sqlx.Open("pgx", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -37,17 +37,17 @@ func NewContext() (*Context, error) {
 }
 
 func buildDSN() string {
-	if rawURL := strings.TrimSpace(os.Getenv("PROD_DB_URL")); rawURL != "" {
+	if rawURL := strings.TrimSpace(os.Getenv("DB_URL")); rawURL != "" {
 		if dsn, err := dsnFromURL(rawURL); err == nil {
 			return dsn
 		}
 	}
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local",
-		env("PROD_DB_USERNAME", "songbank"),
-		env("PROD_DB_PASSWORD", "songbank"),
-		env("PROD_DB_HOST", "127.0.0.1"),
-		normalizePort(env("PROD_DB_PORT", "3306")),
-		env("PROD_DB_DATABASE", "songbanksdb"),
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		env("DB_USERNAME", "songbank"),
+		env("DB_PASSWORD", "songbank"),
+		env("DB_HOST", "127.0.0.1"),
+		normalizePort(env("DB_PORT", "5432")),
+		env("DB_DATABASE", "songbanksdb"),
 	)
 }
 
@@ -65,10 +65,14 @@ func dsnFromURL(raw string) (string, error) {
 	host := u.Hostname()
 	port := normalizePort(u.Port())
 	if port == "" {
-		port = "3306"
+		port = "5432"
 	}
 	dbName := strings.TrimPrefix(u.Path, "/")
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local", user, pass, host, port, dbName), nil
+	sslmode := u.Query().Get("sslmode")
+	if sslmode == "" {
+		sslmode = "disable"
+	}
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", user, pass, host, port, dbName, sslmode), nil
 }
 
 func normalizePort(port string) string {

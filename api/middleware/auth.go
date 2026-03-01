@@ -31,9 +31,9 @@ func (m *AuthMiddleware) RequireAuth(c *fiber.Ctx) error {
 	return c.Next()
 }
 
-func (m *AuthMiddleware) RequirePengurus(c *fiber.Ctx) error {
+func (m *AuthMiddleware) RequireAdmin(c *fiber.Ctx) error {
 	claims := GetClaims(c)
-	if claims == nil || claims.UserType != "pengurus" {
+	if claims == nil || claims.Role != "admin" {
 		return utils.Fail(c, 403, "Admin access required")
 	}
 	return c.Next()

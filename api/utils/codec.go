@@ -4,9 +4,33 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
+
+var (
+	reNonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+	reDashes   = regexp.MustCompile(`-{2,}`)
+)
+
+// Slugify converts a string to a URL-safe slug, e.g. "Amazing Grace" → "amazing-grace".
+func Slugify(s string) string {
+	// Normalize unicode (decompose accents) then strip non-ASCII
+	t := transform.Chain(norm.NFD, transform.RemoveFunc(func(r rune) bool {
+		return unicode.Is(unicode.Mn, r) // remove combining marks
+	}), norm.NFC)
+	result, _, _ := transform.String(t, s)
+	result = strings.ToLower(result)
+	result = reNonAlnum.ReplaceAllString(result, "-")
+	result = reDashes.ReplaceAllString(result, "-")
+	return strings.Trim(result, "-")
+}
+
 
 func ParseArtists(raw string) []string {
 	raw = strings.TrimSpace(raw)

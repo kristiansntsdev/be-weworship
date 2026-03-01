@@ -21,25 +21,49 @@ func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories
 	return &SongService{songs: songRepo, tags: tagRepo, cache: cache}
 }
 
-func (s *SongService) Artists() ([]string, error) {
+func (s *SongService) Artists() ([]map[string]any, error) {
 	raws, err := s.songs.ListArtistsRaw()
 	if err != nil {
 		return nil, err
 	}
-	set := map[string]struct{}{}
+	// Count songs per artist name
+	counts := map[string]int{}
 	for _, r := range raws {
 		for _, a := range utils.ParseArtists(r) {
 			name := strings.TrimSpace(a)
 			if name != "" {
-				set[name] = struct{}{}
+				counts[name]++
 			}
 		}
 	}
-	artists := make([]string, 0, len(set))
-	for v := range set {
-		artists = append(artists, v)
+	artists := make([]map[string]any, 0, len(counts))
+	for name, count := range counts {
+		artists = append(artists, map[string]any{
+			"id":    utils.Slugify(name),
+			"name":  name,
+			"count": count,
+		})
 	}
+	// Sort alphabetically by name
+	sort.Slice(artists, func(i, j int) bool {
+		return artists[i]["name"].(string) < artists[j]["name"].(string)
+	})
 	return artists, nil
+}
+
+func (s *SongService) HomeStats() (map[string]any, error) {
+	songCount, err := s.songs.Count()
+	if err != nil {
+		return nil, err
+	}
+	artists, err := s.Artists()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"song_count":   songCount,
+		"artist_count": len(artists),
+	}, nil
 }
 
 func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int) ([]map[string]any, map[string]any, error) {
@@ -58,10 +82,10 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 		log.Printf("[songs-cache] disabled key=%s", cacheKey)
 	}
 
-	sortMap := map[string]string{"createdAt": "s.createdAt", "updatedAt": "s.updatedAt", "title": "s.title"}
+	sortMap := map[string]string{"createdAt": `s."createdAt"`, "updatedAt": `s."updatedAt"`, "title": "s.title"}
 	mappedSort := sortMap[sortBy]
 	if mappedSort == "" {
-		mappedSort = "s.createdAt"
+		mappedSort = `s."createdAt"`
 	}
 	if strings.ToUpper(sortOrder) != "ASC" {
 		sortOrder = "DESC"
@@ -81,10 +105,14 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 		}
 		data = append(data, map[string]any{
 			"id":                r.ID,
+			"slug":              utils.NullableString(r.Slug),
 			"title":             r.Title,
 			"artist":            utils.ParseArtists(r.Artist.String),
 			"base_chord":        utils.NullableString(r.BaseChord),
 			"lyrics_and_chords": utils.NullableString(r.LyricsAndChord),
+			"external_links":    utils.NullableString(r.ExternalLinks),
+			"dmca_takedown":     r.DmcaTakedown,
+			"dmca_status_notes": utils.NullableString(r.DmcaStatusNotes),
 			"createdAt":         utils.NullableTime(r.CreatedAt),
 			"updatedAt":         utils.NullableTime(r.UpdatedAt),
 			"tags":              tagRows,
@@ -122,19 +150,52 @@ func (s *SongService) GetByID(id int) (map[string]any, bool, error) {
 	}
 	return map[string]any{
 		"id":                row.ID,
+		"slug":              utils.NullableString(row.Slug),
 		"title":             row.Title,
 		"artist":            utils.ParseArtists(row.Artist.String),
 		"base_chord":        utils.NullableString(row.BaseChord),
 		"lyrics_and_chords": utils.NullableString(row.LyricsAndChord),
+		"external_links":    utils.NullableString(row.ExternalLinks),
+		"dmca_takedown":     row.DmcaTakedown,
+		"dmca_status_notes": utils.NullableString(row.DmcaStatusNotes),
 		"createdAt":         utils.NullableTime(row.CreatedAt),
 		"updatedAt":         utils.NullableTime(row.UpdatedAt),
 		"tags":              tagRows,
 	}, true, nil
 }
 
-func (s *SongService) Create(title string, artist any, baseChord, lyrics *string, tagNames []string) (map[string]any, error) {
+func (s *SongService) GetBySlug(slug string) (map[string]any, bool, error) {
+	row, err := s.songs.GetBySlug(slug)
+	if err != nil {
+		return nil, false, err
+	}
+	if row == nil {
+		return nil, false, nil
+	}
+	tags, _ := s.tags.GetTagsForSong(row.ID)
+	tagRows := make([]map[string]any, 0, len(tags))
+	for _, t := range tags {
+		tagRows = append(tagRows, map[string]any{"id": t.ID, "name": t.Name, "description": utils.NullableString(t.Description)})
+	}
+	return map[string]any{
+		"id":                row.ID,
+		"slug":              utils.NullableString(row.Slug),
+		"title":             row.Title,
+		"artist":            utils.ParseArtists(row.Artist.String),
+		"base_chord":        utils.NullableString(row.BaseChord),
+		"lyrics_and_chords": utils.NullableString(row.LyricsAndChord),
+		"external_links":    utils.NullableString(row.ExternalLinks),
+		"dmca_takedown":     row.DmcaTakedown,
+		"dmca_status_notes": utils.NullableString(row.DmcaStatusNotes),
+		"createdAt":         utils.NullableTime(row.CreatedAt),
+		"updatedAt":         utils.NullableTime(row.UpdatedAt),
+		"tags":              tagRows,
+	}, true, nil
+}
+
+func (s *SongService) Create(title string, artist any, baseChord, lyrics *string, externalLinks *string, dmcaTakedown bool, dmcaStatusNotes *string, tagNames []string) (map[string]any, error) {
 	artistJSON := utils.MustArtistJSON(artist)
-	songID, err := s.songs.Create(title, artistJSON, baseChord, lyrics)
+	songID, err := s.songs.Create(title, artistJSON, baseChord, lyrics, externalLinks, dmcaTakedown, dmcaStatusNotes, utils.Slugify(title))
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +209,7 @@ func (s *SongService) Create(title string, artist any, baseChord, lyrics *string
 	return map[string]any{"id": songID, "title": title}, nil
 }
 
-func (s *SongService) Update(songID int, title *string, artist any, baseChord, lyrics *string, tagNames []string, tagNamesProvided bool) (bool, error) {
+func (s *SongService) Update(songID int, title *string, artist any, baseChord, lyrics *string, externalLinks *string, dmcaTakedown *bool, dmcaStatusNotes *string, tagNames []string, tagNamesProvided bool) (bool, error) {
 	parts := []string{}
 	args := []any{}
 	if title != nil {
@@ -166,6 +227,18 @@ func (s *SongService) Update(songID int, title *string, artist any, baseChord, l
 	if lyrics != nil {
 		parts = append(parts, "lyrics_and_chords=?")
 		args = append(args, lyrics)
+	}
+	if externalLinks != nil {
+		parts = append(parts, "external_links=?")
+		args = append(args, externalLinks)
+	}
+	if dmcaTakedown != nil {
+		parts = append(parts, "dmca_takedown=?")
+		args = append(args, *dmcaTakedown)
+	}
+	if dmcaStatusNotes != nil {
+		parts = append(parts, "dmca_status_notes=?")
+		args = append(args, dmcaStatusNotes)
 	}
 
 	if len(parts) > 0 {

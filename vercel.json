@@ -4,10 +4,12 @@
     {
       "src": "api/index.go",
       "use": "@vercel/go"
-    },
+    }
+  ],
+  "routes": [
     {
-      "src": "package.json",
-      "use": "@vercel/next"
+      "src": "/(.*)",
+      "dest": "/api/index.go"
     }
   ],
   "env": {
