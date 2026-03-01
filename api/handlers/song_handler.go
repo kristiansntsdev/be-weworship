@@ -6,6 +6,14 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+func (h *Handler) GetHome(c *fiber.Ctx) error {
+	stats, err := h.songs.HomeStats()
+	if err != nil {
+		return utils.Fail(c, 500, "Failed to retrieve home stats")
+	}
+	return utils.OK(c, 200, "Home stats retrieved successfully", stats)
+}
+
 func (h *Handler) GetArtists(c *fiber.Ctx) error {
 	artists, err := h.songs.Artists()
 	if err != nil {
@@ -35,11 +43,19 @@ func (h *Handler) GetSongs(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetSongByID(c *fiber.Ctx) error {
-	id, err := parseID(c, "id")
-	if err != nil {
-		return utils.Fail(c, 400, "Invalid song ID")
+	identifier := c.Params("id")
+	// Try numeric ID first, fall back to slug lookup
+	if numID, err := parseInt(identifier); err == nil {
+		data, found, err := h.songs.GetByID(numID)
+		if err != nil {
+			return utils.Fail(c, 500, "Failed to retrieve song")
+		}
+		if !found {
+			return utils.Fail(c, 404, "Song not found")
+		}
+		return utils.OK(c, 200, "Song details retrieved successfully", data)
 	}
-	data, found, err := h.songs.GetByID(id)
+	data, found, err := h.songs.GetBySlug(identifier)
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to retrieve song")
 	}
@@ -51,11 +67,14 @@ func (h *Handler) GetSongByID(c *fiber.Ctx) error {
 
 func (h *Handler) CreateSong(c *fiber.Ctx) error {
 	var req struct {
-		Title          string   `json:"title"`
-		Artist         any      `json:"artist"`
-		BaseChord      *string  `json:"base_chord"`
-		LyricsAndChord *string  `json:"lyrics_and_chords"`
-		TagNames       []string `json:"tag_names"`
+		Title           string   `json:"title"`
+		Artist          any      `json:"artist"`
+		BaseChord       *string  `json:"base_chord"`
+		LyricsAndChord  *string  `json:"lyrics_and_chords"`
+		ExternalLinks   *string  `json:"external_links"`
+		DmcaTakedown    bool     `json:"dmca_takedown"`
+		DmcaStatusNotes *string  `json:"dmca_status_notes"`
+		TagNames        []string `json:"tag_names"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Fail(c, 400, "Invalid JSON")
@@ -63,7 +82,7 @@ func (h *Handler) CreateSong(c *fiber.Ctx) error {
 	if req.Title == "" || req.Artist == nil {
 		return utils.Fail(c, 400, "title and artist are required")
 	}
-	out, err := h.songs.Create(req.Title, req.Artist, req.BaseChord, req.LyricsAndChord, req.TagNames)
+	out, err := h.songs.Create(req.Title, req.Artist, req.BaseChord, req.LyricsAndChord, req.ExternalLinks, req.DmcaTakedown, req.DmcaStatusNotes, req.TagNames)
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to create song")
 	}
@@ -76,17 +95,20 @@ func (h *Handler) UpdateSong(c *fiber.Ctx) error {
 		return utils.Fail(c, 400, "Invalid song ID")
 	}
 	var req struct {
-		Title          *string  `json:"title"`
-		Artist         any      `json:"artist"`
-		BaseChord      *string  `json:"base_chord"`
-		LyricsAndChord *string  `json:"lyrics_and_chords"`
-		TagNames       []string `json:"tag_names"`
+		Title           *string  `json:"title"`
+		Artist          any      `json:"artist"`
+		BaseChord       *string  `json:"base_chord"`
+		LyricsAndChord  *string  `json:"lyrics_and_chords"`
+		ExternalLinks   *string  `json:"external_links"`
+		DmcaTakedown    *bool    `json:"dmca_takedown"`
+		DmcaStatusNotes *string  `json:"dmca_status_notes"`
+		TagNames        []string `json:"tag_names"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Fail(c, 400, "Invalid JSON")
 	}
 	hasTagNames := bytes.Contains(c.Body(), []byte(`"tag_names"`))
-	ok, err := h.songs.Update(id, req.Title, req.Artist, req.BaseChord, req.LyricsAndChord, req.TagNames, hasTagNames)
+	ok, err := h.songs.Update(id, req.Title, req.Artist, req.BaseChord, req.LyricsAndChord, req.ExternalLinks, req.DmcaTakedown, req.DmcaStatusNotes, req.TagNames, hasTagNames)
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to update song")
 	}

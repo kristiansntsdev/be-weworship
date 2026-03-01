@@ -10,7 +10,8 @@ import (
 	"be-songbanks-v1/api/platform"
 	"be-songbanks-v1/api/repositories"
 	"be-songbanks-v1/api/services"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/gofiber/adaptor/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -25,6 +26,12 @@ var (
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	once.Do(func() {
+		// Try common .env locations (local dev: api/.env, project root: .env)
+		for _, p := range []string{"api/.env", ".env", "../api/.env"} {
+			if err := godotenv.Load(p); err == nil {
+				break
+			}
+		}
 		fapp, initErr = buildApp()
 	})
 	if initErr != nil {
@@ -46,6 +53,7 @@ func buildApp() (*fiber.App, error) {
 	playlistRepo := repositories.NewPlaylistRepository(ctx.DB)
 	teamRepo := repositories.NewTeamRepository(ctx.DB)
 	userRepo := repositories.NewUserRepository(ctx.DB)
+	analyticsRepo := repositories.NewAnalyticsRepository(ctx.DB)
 
 	songCache := platform.NewSongCache()
 
@@ -53,7 +61,7 @@ func buildApp() (*fiber.App, error) {
 		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		RedirectURI:  os.Getenv("GOOGLE_REDIRECT_URI"),
-		ClientURL:    ctx.ClientURL,
+		ClientURL:    os.Getenv("CLIENT_URL"),
 		MobileScheme: os.Getenv("MOBILE_SCHEME"),
 	})
 	tagSvc := services.NewTagService(tagRepo)
@@ -61,9 +69,10 @@ func buildApp() (*fiber.App, error) {
 	playlistSvc := services.NewPlaylistService(playlistRepo, teamRepo, songRepo, ctx.ClientURL)
 	teamSvc := services.NewTeamService(teamRepo, authRepo, playlistRepo)
 	userSvc := services.NewUserService(userRepo)
+	analyticsSvc := services.NewAnalyticsService(analyticsRepo)
 
 	authMW := middleware.NewAuthMiddleware(authSvc)
-	h := handlers.NewHandler(authMW, authSvc, songSvc, tagSvc, playlistSvc, teamSvc, userSvc)
+	h := handlers.NewHandler(authMW, authSvc, songSvc, tagSvc, playlistSvc, teamSvc, userSvc, analyticsSvc)
 
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	app.Use(cors.New(cors.Config{

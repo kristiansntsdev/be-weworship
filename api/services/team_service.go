@@ -37,18 +37,18 @@ func (s *TeamService) GetByID(teamID int) (map[string]any, int, error) {
 	if team == nil {
 		return nil, 404, fmt.Errorf("playlist team not found")
 	}
-	leader, _ := s.users.FindPesertaBasicByID(team.LeadID)
+	leader, _ := s.users.FindByID(team.LeadID)
 	members := utils.ParseIntSlice(team.MembersRaw.String)
 	memberRows := []map[string]any{}
 	for _, id := range members {
-		u, err := s.users.FindPesertaBasicByID(id)
+		u, err := s.users.FindByID(id)
 		if err == nil && u != nil {
-			memberRows = append(memberRows, map[string]any{"id": u.ID, "nama": u.Nama, "email": u.Email})
+			memberRows = append(memberRows, map[string]any{"id": u.ID, "name": u.Name, "email": u.Email})
 		}
 	}
 	var leaderMap any
 	if leader != nil {
-		leaderMap = map[string]any{"id": leader.ID, "nama": leader.Nama, "email": leader.Email}
+		leaderMap = map[string]any{"id": leader.ID, "name": leader.Name, "email": leader.Email}
 	}
 	return map[string]any{"id": team.ID, "playlist_id": team.PlaylistID, "lead_id": team.LeadID, "leader": leaderMap, "members": memberRows, "createdAt": utils.NullableTime(team.CreatedAt), "updatedAt": utils.NullableTime(team.UpdatedAt)}, 200, nil
 }
