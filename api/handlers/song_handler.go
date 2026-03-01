@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"be-songbanks-v1/api/middleware"
 	"be-songbanks-v1/api/utils"
 	"bytes"
 	"github.com/gofiber/fiber/v2"
@@ -98,6 +99,11 @@ func (h *Handler) CreateSong(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to create song")
 	}
+	cl := middleware.GetClaims(c)
+	if cl != nil {
+		uid := cl.UserID
+		h.audit.Log(&uid, cl.Name, cl.Email, "create", "song", nil, req.Title, map[string]any{"title": req.Title, "artist": req.Artist, "base_chord": req.BaseChord})
+	}
 	return utils.OK(c, 201, "Song created successfully", out)
 }
 
@@ -120,12 +126,38 @@ func (h *Handler) UpdateSong(c *fiber.Ctx) error {
 		return utils.Fail(c, 400, "Invalid JSON")
 	}
 	hasTagNames := bytes.Contains(c.Body(), []byte(`"tag_names"`))
+
+	// Snapshot before for diff
+	beforeMap, _, _ := h.songs.GetByID(id)
+
 	ok, err := h.songs.Update(id, req.Title, req.Artist, req.BaseChord, req.LyricsAndChord, req.ExternalLinks, req.DmcaTakedown, req.DmcaStatusNotes, req.TagNames, hasTagNames)
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to update song")
 	}
 	if !ok {
 		return utils.Fail(c, 404, "Song not found")
+	}
+	cl := middleware.GetClaims(c)
+	if cl != nil {
+		uid := cl.UserID
+		changes := map[string]any{}
+		if req.Title != nil {
+			changes["title"] = map[string]any{"from": strVal(beforeMap, "title"), "to": *req.Title}
+		}
+		if req.Artist != nil {
+			changes["artist"] = map[string]any{"from": strVal(beforeMap, "artist"), "to": req.Artist}
+		}
+		if req.BaseChord != nil {
+			changes["base_chord"] = map[string]any{"from": strVal(beforeMap, "base_chord"), "to": *req.BaseChord}
+		}
+		if req.LyricsAndChord != nil {
+			changes["lyrics_and_chords"] = "updated"
+		}
+		if req.ExternalLinks != nil {
+			changes["external_links"] = *req.ExternalLinks
+		}
+		entityName := strVal(beforeMap, "title")
+		h.audit.Log(&uid, cl.Name, cl.Email, "update", "song", &id, entityName, changes)
 	}
 	return utils.OK(c, 200, "Song updated successfully", fiber.Map{"id": id})
 }
@@ -135,6 +167,7 @@ func (h *Handler) DeleteSong(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Fail(c, 400, "Invalid song ID")
 	}
+	before, _, _ := h.songs.GetByID(id)
 	ok, err := h.songs.Delete(id)
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to delete song")
@@ -142,5 +175,23 @@ func (h *Handler) DeleteSong(c *fiber.Ctx) error {
 	if !ok {
 		return utils.Fail(c, 404, "Song not found")
 	}
+	cl := middleware.GetClaims(c)
+	if cl != nil {
+		uid := cl.UserID
+		entityName := strVal(before, "title")
+		h.audit.Log(&uid, cl.Name, cl.Email, "delete", "song", &id, entityName, nil)
+	}
 	return utils.OK(c, 200, "Song deleted successfully", fiber.Map{"id": id})
+}
+
+func strVal(m map[string]any, key string) string {
+if m == nil {
+return ""
+}
+if v, ok := m[key]; ok {
+if s, ok := v.(string); ok {
+return s
+}
+}
+return ""
 }

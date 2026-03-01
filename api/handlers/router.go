@@ -19,10 +19,11 @@ playlists *services.PlaylistService
 teams     *services.TeamService
 users     *services.UserService
 analytics *services.AnalyticsService
+audit     *services.AuditService
 }
 
-func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService) *Handler {
-return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics}
+func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService) *Handler {
+return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit}
 }
 
 func (h *Handler) Register(app *fiber.App) {
@@ -84,6 +85,9 @@ admin.Get("/analytics/users", h.GetAnalyticsUsers)
 admin.Get("/analytics/searches", h.GetAnalyticsSearches)
 admin.Get("/analytics/sessions", h.GetAnalyticsSessions)
 admin.Get("/analytics/performance", h.GetAnalyticsPerformance)
+
+// Audit log
+admin.Get("/audit-logs", h.GetAuditLogs)
 
 app.Use(func(c *fiber.Ctx) error {
 return utils.Fail(c, 404, fmt.Sprintf("Route %s %s not found", c.Method(), c.OriginalURL()))

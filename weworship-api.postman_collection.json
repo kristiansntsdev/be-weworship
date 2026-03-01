@@ -1087,6 +1087,55 @@
             },
             "description": "p50/p95 latency per metric type (`screen_load`, `song_load`, `api_response`). Computed via PostgreSQL `PERCENTILE_CONT`."
           }
+        },
+        {
+          "name": "Get audit logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/audit-logs?page=1&limit=30&action=&entity_type=&user_id=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "30"
+                },
+                {
+                  "key": "action",
+                  "value": "",
+                  "description": "Filter: create | update | delete"
+                },
+                {
+                  "key": "entity_type",
+                  "value": "",
+                  "description": "Filter: song | user | tag"
+                },
+                {
+                  "key": "user_id",
+                  "value": "",
+                  "description": "Filter by specific user ID"
+                }
+              ]
+            },
+            "description": "Paginated audit log. Admin only.\n\n**Response data:** array of `{ id, user_id, user_name, user_email, action, entity_type, entity_id, entity_name, changes, createdAt }`\n- `changes` is a JSON string with field diffs: `{ field: { from, to } }` for updates, snapshot for creates, null for deletes"
+          }
         }
       ]
     },
