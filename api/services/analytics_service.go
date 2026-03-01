@@ -44,15 +44,23 @@ return s.repo.TopSongs(days, limit)
 }
 
 func (s *AnalyticsService) UserStats(days int) (map[string]any, error) {
-newUsers, err := s.repo.NewUsersPerDay(days)
+totalUsers, err := s.repo.TotalUsers()
 if err != nil {
 return nil, err
 }
-dau, err := s.repo.DAU(days)
+dau, err := s.repo.DAUToday()
 if err != nil {
 return nil, err
 }
-return map[string]any{"new_users": newUsers, "dau": dau}, nil
+mau, err := s.repo.MAU()
+if err != nil {
+return nil, err
+}
+return map[string]any{
+"total_users": totalUsers,
+"dau":         dau,
+"mau":         mau,
+}, nil
 }
 
 func (s *AnalyticsService) TopSearches(days, limit int) (any, error) {
