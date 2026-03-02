@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     email        VARCHAR(255) UNIQUE NOT NULL,
     password     TEXT,                              -- null for OAuth-only users
     avatar_url   TEXT,
-    role         VARCHAR(20)         NOT NULL DEFAULT 'user',     -- 'user' | 'admin'
+    role         VARCHAR(20)         NOT NULL DEFAULT 'user',     -- 'user' | 'admin' | 'maintainer'
     provider     VARCHAR(20)         NOT NULL DEFAULT 'local',    -- 'local' | 'google'
     provider_id  TEXT,                              -- Google sub ID
     verified     BOOLEAN             NOT NULL DEFAULT FALSE,

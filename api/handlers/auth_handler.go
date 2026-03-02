@@ -86,5 +86,6 @@ return utils.OK(c, 200, "Permission granted", fiber.Map{
 "hasPermission": true,
 "role":          cl.Role,
 "isAdmin":       cl.Role == "admin",
+"isMaintainer":  cl.Role == "admin" || cl.Role == "maintainer",
 })
 }
