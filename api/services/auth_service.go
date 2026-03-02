@@ -98,8 +98,12 @@ if err != nil {
 return "", err
 }
 
-if state == "mobile" && s.google.MobileScheme != "" {
-return s.google.MobileScheme + "://auth/callback?token=" + token, nil
+if state == "mobile" {
+scheme := s.google.MobileScheme
+if scheme == "" {
+scheme = "weworship"
+}
+return scheme + "://auth/callback?token=" + token, nil
 }
 if s.google.ClientURL != "" {
 return s.google.ClientURL + "/auth/callback?token=" + token, nil

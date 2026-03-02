@@ -69,9 +69,12 @@ func injectDetail(h *Handler, data map[string]any) {
 }
 
 // GoogleLogin redirects the browser to Google's OAuth consent screen.
-// Query param: client=web|mobile  (defaults to "web")
+// Accepts ?client=mobile or ?state=mobile (mobile app uses ?state=mobile).
 func (h *Handler) GoogleLogin(c *fiber.Ctx) error {
-client := c.Query("client", "web")
+client := c.Query("client", "")
+if client == "" {
+client = c.Query("state", "web")
+}
 if client != "web" && client != "mobile" {
 client = "web"
 }
