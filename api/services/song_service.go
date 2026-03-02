@@ -44,6 +44,18 @@ func parseExternalLinks(raw string) (spotify, youtube, appleMusic *string) {
 }
 
 func (s *SongService) Artists() ([]map[string]any, error) {
+	const cacheKey = "artists:list"
+	if s.cache != nil && s.cache.Enabled() {
+		var cached []map[string]any
+		if s.cache.Get(cacheKey, &cached) {
+			log.Printf("[artists-cache] hit")
+			return cached, nil
+		}
+		log.Printf("[artists-cache] miss")
+	} else {
+		log.Printf("[artists-cache] disabled")
+	}
+
 	raws, err := s.songs.ListArtistsRaw()
 	if err != nil {
 		return nil, err
@@ -70,6 +82,11 @@ func (s *SongService) Artists() ([]map[string]any, error) {
 	sort.Slice(artists, func(i, j int) bool {
 		return artists[i]["name"].(string) < artists[j]["name"].(string)
 	})
+
+	if s.cache != nil && s.cache.Enabled() {
+		s.cache.Set(cacheKey, artists)
+		log.Printf("[artists-cache] set")
+	}
 	return artists, nil
 }
 
@@ -241,6 +258,7 @@ func (s *SongService) Create(title string, artist any, baseChord *string, bpm *i
 	}
 	if s.cache != nil {
 		s.cache.InvalidateSongsList()
+		s.cache.InvalidateArtists()
 		log.Printf("[songs-cache] invalidate reason=create song_id=%d", songID)
 	}
 	return map[string]any{"id": songID, "title": title}, nil
@@ -303,6 +321,7 @@ func (s *SongService) Update(songID int, title *string, artist any, baseChord *s
 
 	if s.cache != nil {
 		s.cache.InvalidateSongsList()
+		s.cache.InvalidateArtists()
 		log.Printf("[songs-cache] invalidate reason=update song_id=%d", songID)
 	}
 	return true, nil
@@ -315,6 +334,7 @@ func (s *SongService) Delete(songID int) (bool, error) {
 	}
 	if affected > 0 && s.cache != nil {
 		s.cache.InvalidateSongsList()
+		s.cache.InvalidateArtists()
 		log.Printf("[songs-cache] invalidate reason=delete song_id=%d", songID)
 	}
 	return affected > 0, nil

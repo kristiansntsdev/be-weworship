@@ -84,3 +84,12 @@ func (c *SongCache) InvalidateSongsList() {
 		}
 	}
 }
+
+func (c *SongCache) InvalidateArtists() {
+	if !c.Enabled() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_ = c.client.Del(ctx, "artists:list").Err()
+}
