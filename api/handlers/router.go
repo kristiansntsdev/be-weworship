@@ -58,6 +58,7 @@ ra := h.authMW.RequireAuth
 api.Post("/auth/logout", ra, func(c *fiber.Ctx) error { return utils.OK(c, 200, "Logout successful", nil) })
 api.Get("/auth/me", ra, h.GetMe)
 api.Get("/auth/check-permission", ra, h.CheckPermission)
+api.Put("/profile", ra, h.UpdateProfile)
 
 api.Post("/playlists", ra, h.CreatePlaylist)
 api.Get("/playlists", ra, h.GetPlaylists)

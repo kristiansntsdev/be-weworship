@@ -41,3 +41,27 @@ func (r *UserRepository) List(search string, page, limit int) ([]models.User, er
 	err := r.db.Select(&rows, query, args...)
 	return rows, err
 }
+
+func (r *UserRepository) GetDetail(userID int) (*models.UserDetail, error) {
+	var d models.UserDetail
+	err := r.db.Get(&d, `SELECT user_id,full_name,province,city,postal_code,"createdAt","updatedAt" FROM users_detail WHERE user_id = $1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (r *UserRepository) UpsertDetail(userID int, fullName, province, city, postalCode *string) error {
+	_, err := r.db.Exec(
+		`INSERT INTO users_detail (user_id, full_name, province, city, postal_code, "updatedAt")
+		 VALUES ($1, $2, $3, $4, $5, NOW())
+		 ON CONFLICT (user_id) DO UPDATE SET
+		   full_name   = EXCLUDED.full_name,
+		   province    = EXCLUDED.province,
+		   city        = EXCLUDED.city,
+		   postal_code = EXCLUDED.postal_code,
+		   "updatedAt" = NOW()`,
+		userID, fullName, province, city, postalCode,
+	)
+	return err
+}

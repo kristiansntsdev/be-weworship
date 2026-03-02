@@ -27,3 +27,11 @@ return nil, 0, err
 rows, err := s.repo.List(search, page, limit)
 return rows, total, err
 }
+
+func (s *UserService) GetDetail(userID int) (*models.UserDetail, error) {
+return s.repo.GetDetail(userID)
+}
+
+func (s *UserService) UpdateProfile(userID int, fullName, province, city, postalCode *string) error {
+return s.repo.UpsertDetail(userID, fullName, province, city, postalCode)
+}

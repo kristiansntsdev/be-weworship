@@ -66,14 +66,48 @@ return c.Redirect(redirectURL, fiber.StatusFound)
 
 func (h *Handler) GetMe(c *fiber.Ctx) error {
 cl := middleware.GetClaims(c)
+detail, _ := h.users.GetDetail(cl.UserID)
+detailMap := map[string]any{"full_name": nil, "province": nil, "city": nil, "postal_code": nil}
+if detail != nil {
+if detail.FullName.Valid {
+detailMap["full_name"] = detail.FullName.String
+}
+if detail.Province.Valid {
+detailMap["province"] = detail.Province.String
+}
+if detail.City.Valid {
+detailMap["city"] = detail.City.String
+}
+if detail.PostalCode.Valid {
+detailMap["postal_code"] = detail.PostalCode.String
+}
+}
 return utils.OK(c, 200, "Current user retrieved successfully", fiber.Map{
 "user": fiber.Map{
-"id":    cl.UserID,
-"name":  cl.Name,
-"email": cl.Email,
-"role":  cl.Role,
+"id":     cl.UserID,
+"name":   cl.Name,
+"email":  cl.Email,
+"role":   cl.Role,
+"detail": detailMap,
 },
 })
+}
+
+func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
+cl := middleware.GetClaims(c)
+var req struct {
+FullName   *string `json:"full_name"`
+Province   *string `json:"province"`
+City       *string `json:"city"`
+PostalCode *string `json:"postal_code"`
+}
+if err := c.BodyParser(&req); err != nil {
+return utils.Fail(c, 400, "Invalid request body")
+}
+if err := h.users.UpdateProfile(cl.UserID, req.FullName, req.Province, req.City, req.PostalCode); err != nil {
+return utils.Fail(c, 500, "Failed to update profile")
+}
+return utils.OK(c, 200, "Profile updated successfully", nil)
 }
 
 func (h *Handler) CheckPermission(c *fiber.Ctx) error {

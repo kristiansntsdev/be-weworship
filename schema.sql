@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS playlist_teams (
     "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS users_detail (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    full_name   VARCHAR(255),
+    province    VARCHAR(100),
+    city        VARCHAR(100),
+    postal_code VARCHAR(20),
+    "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- ── Analytics ────────────────────────────────────────────────────────────────
 
 -- Song interaction events
@@ -124,6 +134,7 @@ CREATE TABLE IF NOT EXISTS performance_logs (
 -- ── Indexes ───────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_users_email              ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role               ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_detail_user_id     ON users_detail(user_id);
 CREATE INDEX IF NOT EXISTS idx_playlists_user_id        ON playlists(user_id);
 CREATE INDEX IF NOT EXISTS idx_playlists_share_token    ON playlists(share_token);
 CREATE INDEX IF NOT EXISTS idx_playlist_teams_playlist  ON playlist_teams(playlist_id);

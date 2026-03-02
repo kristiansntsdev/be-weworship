@@ -20,6 +20,16 @@ type User struct {
 	UpdatedAt  time.Time      `db:"updatedAt"`
 }
 
+type UserDetail struct {
+	UserID     int            `db:"user_id"`
+	FullName   sql.NullString `db:"full_name"`
+	Province   sql.NullString `db:"province"`
+	City       sql.NullString `db:"city"`
+	PostalCode sql.NullString `db:"postal_code"`
+	CreatedAt  time.Time      `db:"createdAt"`
+	UpdatedAt  time.Time      `db:"updatedAt"`
+}
+
 type UserBasic struct {
 	ID    int    `db:"id"`
 	Name  string `db:"name"`
