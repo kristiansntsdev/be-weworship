@@ -39,6 +39,14 @@ func (m *AuthMiddleware) RequireAdmin(c *fiber.Ctx) error {
 	return c.Next()
 }
 
+func (m *AuthMiddleware) RequireMaintainer(c *fiber.Ctx) error {
+	claims := GetClaims(c)
+	if claims == nil || (claims.Role != "admin" && claims.Role != "maintainer") {
+		return utils.Fail(c, 403, "Maintainer access required")
+	}
+	return c.Next()
+}
+
 func GetClaims(c *fiber.Ctx) *types.Claims {
 	cl, _ := c.Locals("claims").(*types.Claims)
 	return cl

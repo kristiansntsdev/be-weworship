@@ -77,10 +77,12 @@ api.Delete("/playlist-teams/:id", ra, h.DeleteTeam)
 api.Post("/playlist-teams/:id/leave", ra, h.LeaveTeam)
 
 // ── Admin routes ───────────────────────────────────────────────────────
+// Song CRUD: accessible by admin or maintainer
+rm := h.authMW.RequireMaintainer
+api.Post("/admin/songs", ra, rm, h.CreateSong)
+api.Put("/admin/songs/:id", ra, rm, h.UpdateSong)
+api.Delete("/admin/songs/:id", ra, rm, h.DeleteSong)
 admin := api.Group("/admin", ra, h.authMW.RequireAdmin)
-admin.Post("/songs", h.CreateSong)
-admin.Put("/songs/:id", h.UpdateSong)
-admin.Delete("/songs/:id", h.DeleteSong)
 admin.Get("/users", h.GetUsers)
 
 // Analytics (admin read)
