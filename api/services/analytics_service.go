@@ -15,7 +15,7 @@ return &AnalyticsService{repo: repo}
 }
 
 func (s *AnalyticsService) RecordSongEvent(songID, userID *int, eventType, platform string, durationMs *int) {
-go s.repo.RecordSongEvent(songID, userID, eventType, platform, durationMs)
+s.repo.RecordSongEvent(songID, userID, eventType, platform, durationMs)
 }
 
 func (s *AnalyticsService) RecordSearch(userID *int, query string, filters map[string]any, resultsCount int, platform string) {
@@ -26,15 +26,15 @@ s := string(b)
 filtersJSON = &s
 }
 }
-go s.repo.RecordSearchLog(userID, query, filtersJSON, resultsCount, platform)
+s.repo.RecordSearchLog(userID, query, filtersJSON, resultsCount, platform)
 }
 
 func (s *AnalyticsService) RecordSession(userID *int, platform, appVersion, deviceOS string) {
-go s.repo.RecordSession(userID, platform, appVersion, deviceOS)
+s.repo.RecordSession(userID, platform, appVersion, deviceOS)
 }
 
 func (s *AnalyticsService) RecordPerformance(userID *int, platform, metricType string, endpoint, screenName *string, durationMs, statusCode *int, appVersion, deviceOS string) {
-go s.repo.RecordPerformance(userID, platform, metricType, endpoint, screenName, durationMs, statusCode, appVersion, deviceOS)
+s.repo.RecordPerformance(userID, platform, metricType, endpoint, screenName, durationMs, statusCode, appVersion, deviceOS)
 }
 
 // Admin analytics aggregates
