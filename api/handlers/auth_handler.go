@@ -19,6 +19,7 @@ func (h *Handler) RegisterUser(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Fail(c, status, err.Error())
 	}
+	injectDetail(h, data)
 	return utils.OK(c, status, "Account created successfully", data)
 }
 
@@ -34,7 +35,37 @@ data, status, err := h.auth.Login(req.Email, req.Password)
 if err != nil {
 return utils.Fail(c, status, err.Error())
 }
+injectDetail(h, data)
 return utils.OK(c, 200, "Login successful", data)
+}
+
+// injectDetail fetches user_detail and embeds it into the "user" map returned by auth responses.
+func injectDetail(h *Handler, data map[string]any) {
+	userMap, ok := data["user"].(map[string]any)
+	if !ok {
+		return
+	}
+	userID, ok := userMap["id"].(int)
+	if !ok {
+		return
+	}
+	detail, _ := h.users.GetDetail(userID)
+	detailMap := map[string]any{"full_name": nil, "province": nil, "city": nil, "postal_code": nil}
+	if detail != nil {
+		if detail.FullName.Valid {
+			detailMap["full_name"] = detail.FullName.String
+		}
+		if detail.Province.Valid {
+			detailMap["province"] = detail.Province.String
+		}
+		if detail.City.Valid {
+			detailMap["city"] = detail.City.String
+		}
+		if detail.PostalCode.Valid {
+			detailMap["postal_code"] = detail.PostalCode.String
+		}
+	}
+	userMap["detail"] = detailMap
 }
 
 // GoogleLogin redirects the browser to Google's OAuth consent screen.
