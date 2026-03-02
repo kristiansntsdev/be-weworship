@@ -11,7 +11,7 @@ func NewAuditService(repo *repositories.AuditRepository) *AuditService {
 }
 
 func (s *AuditService) Log(userID *int, userName, userEmail, action, entityType string, entityID *int, entityName string, changes any) {
-	go s.repo.Log(userID, userName, userEmail, action, entityType, entityID, entityName, changes)
+	s.repo.Log(userID, userName, userEmail, action, entityType, entityID, entityName, changes)
 }
 
 func (s *AuditService) List(action, entityType string, userID *int, page, limit int) ([]repositories.AuditLogRow, int, error) {
