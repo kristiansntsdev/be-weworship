@@ -23,8 +23,9 @@ CREATE TABLE IF NOT EXISTS songs (
     title             VARCHAR(255)  NOT NULL,
     artist            TEXT,
     base_chord        VARCHAR(10),
+    bpm               INTEGER,
     lyrics_and_chords TEXT,
-    external_links    JSONB,                          -- {spotify: "url", youtube: "url"}
+    external_links    JSONB,                          -- {spotify: "url", youtube: "url", apple_music: "url"}
     dmca_takedown     BOOLEAN       NOT NULL DEFAULT FALSE,
     dmca_status_notes TEXT,
     created_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,

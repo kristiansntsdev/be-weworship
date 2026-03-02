@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"sort"
@@ -19,6 +20,27 @@ type SongService struct {
 
 func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories.TagRepository, cache *platform.SongCache) *SongService {
 	return &SongService{songs: songRepo, tags: tagRepo, cache: cache}
+}
+
+// parseExternalLinks parses a JSON external_links string into individual URL fields.
+func parseExternalLinks(raw string) (spotify, youtube, appleMusic *string) {
+	if raw == "" {
+		return nil, nil, nil
+	}
+	var m map[string]string
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return nil, nil, nil
+	}
+	if v, ok := m["spotify"]; ok && v != "" {
+		spotify = &v
+	}
+	if v, ok := m["youtube"]; ok && v != "" {
+		youtube = &v
+	}
+	if v, ok := m["apple_music"]; ok && v != "" {
+		appleMusic = &v
+	}
+	return
 }
 
 func (s *SongService) Artists() ([]map[string]any, error) {
@@ -103,14 +125,19 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 		for _, t := range tags {
 			tagRows = append(tagRows, map[string]any{"id": t.ID, "name": t.Name, "description": utils.NullableString(t.Description)})
 		}
+		sp, yt, am := parseExternalLinks(r.ExternalLinks.String)
 		data = append(data, map[string]any{
 			"id":                r.ID,
 			"slug":              utils.NullableString(r.Slug),
 			"title":             r.Title,
 			"artist":            utils.ParseArtists(r.Artist.String),
 			"base_chord":        utils.NullableString(r.BaseChord),
+			"bpm":               func() any { if r.Bpm.Valid { return r.Bpm.Int64 }; return nil }(),
 			"lyrics_and_chords": utils.NullableString(r.LyricsAndChord),
 			"external_links":    utils.NullableString(r.ExternalLinks),
+			"spotify_url":       sp,
+			"youtube_url":       yt,
+			"apple_music_url":   am,
 			"dmca_takedown":     r.DmcaTakedown,
 			"dmca_status_notes": utils.NullableString(r.DmcaStatusNotes),
 			"createdAt":         utils.NullableTime(r.CreatedAt),
@@ -148,14 +175,19 @@ func (s *SongService) GetByID(id int) (map[string]any, bool, error) {
 	for _, t := range tags {
 		tagRows = append(tagRows, map[string]any{"id": t.ID, "name": t.Name, "description": utils.NullableString(t.Description)})
 	}
+	sp, yt, am := parseExternalLinks(row.ExternalLinks.String)
 	return map[string]any{
 		"id":                row.ID,
 		"slug":              utils.NullableString(row.Slug),
 		"title":             row.Title,
 		"artist":            utils.ParseArtists(row.Artist.String),
 		"base_chord":        utils.NullableString(row.BaseChord),
+		"bpm":               func() any { if row.Bpm.Valid { return row.Bpm.Int64 }; return nil }(),
 		"lyrics_and_chords": utils.NullableString(row.LyricsAndChord),
 		"external_links":    utils.NullableString(row.ExternalLinks),
+		"spotify_url":       sp,
+		"youtube_url":       yt,
+		"apple_music_url":   am,
 		"dmca_takedown":     row.DmcaTakedown,
 		"dmca_status_notes": utils.NullableString(row.DmcaStatusNotes),
 		"createdAt":         utils.NullableTime(row.CreatedAt),
@@ -177,14 +209,19 @@ func (s *SongService) GetBySlug(slug string) (map[string]any, bool, error) {
 	for _, t := range tags {
 		tagRows = append(tagRows, map[string]any{"id": t.ID, "name": t.Name, "description": utils.NullableString(t.Description)})
 	}
+	sp2, yt2, am2 := parseExternalLinks(row.ExternalLinks.String)
 	return map[string]any{
 		"id":                row.ID,
 		"slug":              utils.NullableString(row.Slug),
 		"title":             row.Title,
 		"artist":            utils.ParseArtists(row.Artist.String),
 		"base_chord":        utils.NullableString(row.BaseChord),
+		"bpm":               func() any { if row.Bpm.Valid { return row.Bpm.Int64 }; return nil }(),
 		"lyrics_and_chords": utils.NullableString(row.LyricsAndChord),
 		"external_links":    utils.NullableString(row.ExternalLinks),
+		"spotify_url":       sp2,
+		"youtube_url":       yt2,
+		"apple_music_url":   am2,
 		"dmca_takedown":     row.DmcaTakedown,
 		"dmca_status_notes": utils.NullableString(row.DmcaStatusNotes),
 		"createdAt":         utils.NullableTime(row.CreatedAt),
@@ -193,9 +230,9 @@ func (s *SongService) GetBySlug(slug string) (map[string]any, bool, error) {
 	}, true, nil
 }
 
-func (s *SongService) Create(title string, artist any, baseChord, lyrics *string, externalLinks *string, dmcaTakedown bool, dmcaStatusNotes *string, tagNames []string) (map[string]any, error) {
+func (s *SongService) Create(title string, artist any, baseChord *string, bpm *int, lyrics *string, externalLinks *string, dmcaTakedown bool, dmcaStatusNotes *string, tagNames []string) (map[string]any, error) {
 	artistJSON := utils.MustArtistJSON(artist)
-	songID, err := s.songs.Create(title, artistJSON, baseChord, lyrics, externalLinks, dmcaTakedown, dmcaStatusNotes, utils.Slugify(title))
+	songID, err := s.songs.Create(title, artistJSON, baseChord, bpm, lyrics, externalLinks, dmcaTakedown, dmcaStatusNotes, utils.Slugify(title))
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +246,7 @@ func (s *SongService) Create(title string, artist any, baseChord, lyrics *string
 	return map[string]any{"id": songID, "title": title}, nil
 }
 
-func (s *SongService) Update(songID int, title *string, artist any, baseChord, lyrics *string, externalLinks *string, dmcaTakedown *bool, dmcaStatusNotes *string, tagNames []string, tagNamesProvided bool) (bool, error) {
+func (s *SongService) Update(songID int, title *string, artist any, baseChord *string, bpm *int, lyrics *string, externalLinks *string, dmcaTakedown *bool, dmcaStatusNotes *string, tagNames []string, tagNamesProvided bool) (bool, error) {
 	parts := []string{}
 	args := []any{}
 	if title != nil {
@@ -223,6 +260,10 @@ func (s *SongService) Update(songID int, title *string, artist any, baseChord, l
 	if baseChord != nil {
 		parts = append(parts, "base_chord=?")
 		args = append(args, baseChord)
+	}
+	if bpm != nil {
+		parts = append(parts, "bpm=?")
+		args = append(args, *bpm)
 	}
 	if lyrics != nil {
 		parts = append(parts, "lyrics_and_chords=?")

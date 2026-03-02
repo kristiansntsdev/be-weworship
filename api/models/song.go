@@ -8,6 +8,7 @@ type Song struct {
 	Title            string         `db:"title"`
 	Artist           sql.NullString `db:"artist"`
 	BaseChord        sql.NullString `db:"base_chord"`
+	Bpm              sql.NullInt64  `db:"bpm"`
 	LyricsAndChord   sql.NullString `db:"lyrics_and_chords"`
 	ExternalLinks    sql.NullString `db:"external_links"`
 	DmcaTakedown     bool           `db:"dmca_takedown"`

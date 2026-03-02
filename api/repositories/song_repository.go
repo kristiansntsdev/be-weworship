@@ -61,7 +61,7 @@ func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOr
 		return nil, 0, err
 	}
 
-	query := r.db.Rebind(`SELECT s.id,s.slug,s.title,s.artist,s.base_chord,s.lyrics_and_chords,s.external_links,s.dmca_takedown,s.dmca_status_notes,s."createdAt",s."updatedAt" FROM songs s WHERE ` + whereClause + ` ORDER BY ` + sortBy + ` ` + sortOrder + ` LIMIT ? OFFSET ?`)
+	query := r.db.Rebind(`SELECT s.id,s.slug,s.title,s.artist,s.base_chord,s.bpm,s.lyrics_and_chords,s.external_links,s.dmca_takedown,s.dmca_status_notes,s."createdAt",s."updatedAt" FROM songs s WHERE ` + whereClause + ` ORDER BY ` + sortBy + ` ` + sortOrder + ` LIMIT ? OFFSET ?`)
 	args = append(args, limit, offset)
 	rows := []models.Song{}
 	if err := r.db.Select(&rows, query, args...); err != nil {
@@ -73,7 +73,7 @@ func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOr
 
 func (r *SongRepository) GetByID(id int) (*models.Song, error) {
 	var row models.Song
-	err := r.db.Get(&row, r.db.Rebind(`SELECT id,slug,title,artist,base_chord,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt" FROM songs WHERE id=?`), id)
+	err := r.db.Get(&row, r.db.Rebind(`SELECT id,slug,title,artist,base_chord,bpm,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt" FROM songs WHERE id=?`), id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -85,7 +85,7 @@ func (r *SongRepository) GetByID(id int) (*models.Song, error) {
 
 func (r *SongRepository) GetBySlug(slug string) (*models.Song, error) {
 	var row models.Song
-	err := r.db.Get(&row, r.db.Rebind(`SELECT id,slug,title,artist,base_chord,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt" FROM songs WHERE slug=?`), slug)
+	err := r.db.Get(&row, r.db.Rebind(`SELECT id,slug,title,artist,base_chord,bpm,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt" FROM songs WHERE slug=?`), slug)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -95,9 +95,9 @@ func (r *SongRepository) GetBySlug(slug string) (*models.Song, error) {
 	return &row, nil
 }
 
-func (r *SongRepository) Create(title, artistJSON string, baseChord, lyrics *string, externalLinks *string, dmcaTakedown bool, dmcaStatusNotes *string, baseSlug string) (int, error) {
+func (r *SongRepository) Create(title, artistJSON string, baseChord *string, bpm *int, lyrics *string, externalLinks *string, dmcaTakedown bool, dmcaStatusNotes *string, baseSlug string) (int, error) {
 	var id int
-	err := r.db.QueryRow(r.db.Rebind(`INSERT INTO songs (slug,title,artist,base_chord,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,NOW(),NOW()) RETURNING id`), baseSlug, title, artistJSON, baseChord, lyrics, externalLinks, dmcaTakedown, dmcaStatusNotes).Scan(&id)
+	err := r.db.QueryRow(r.db.Rebind(`INSERT INTO songs (slug,title,artist,base_chord,bpm,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,NOW(),NOW()) RETURNING id`), baseSlug, title, artistJSON, baseChord, bpm, lyrics, externalLinks, dmcaTakedown, dmcaStatusNotes).Scan(&id)
 	if err != nil {
 		return 0, err
 	}

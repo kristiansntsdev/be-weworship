@@ -83,6 +83,7 @@ func (h *Handler) CreateSong(c *fiber.Ctx) error {
 		Title           string   `json:"title"`
 		Artist          any      `json:"artist"`
 		BaseChord       *string  `json:"base_chord"`
+		Bpm             *int     `json:"bpm"`
 		LyricsAndChord  *string  `json:"lyrics_and_chords"`
 		ExternalLinks   *string  `json:"external_links"`
 		DmcaTakedown    bool     `json:"dmca_takedown"`
@@ -95,7 +96,7 @@ func (h *Handler) CreateSong(c *fiber.Ctx) error {
 	if req.Title == "" || req.Artist == nil {
 		return utils.Fail(c, 400, "title and artist are required")
 	}
-	out, err := h.songs.Create(req.Title, req.Artist, req.BaseChord, req.LyricsAndChord, req.ExternalLinks, req.DmcaTakedown, req.DmcaStatusNotes, req.TagNames)
+	out, err := h.songs.Create(req.Title, req.Artist, req.BaseChord, req.Bpm, req.LyricsAndChord, req.ExternalLinks, req.DmcaTakedown, req.DmcaStatusNotes, req.TagNames)
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to create song")
 	}
@@ -116,6 +117,7 @@ func (h *Handler) UpdateSong(c *fiber.Ctx) error {
 		Title           *string  `json:"title"`
 		Artist          any      `json:"artist"`
 		BaseChord       *string  `json:"base_chord"`
+		Bpm             *int     `json:"bpm"`
 		LyricsAndChord  *string  `json:"lyrics_and_chords"`
 		ExternalLinks   *string  `json:"external_links"`
 		DmcaTakedown    *bool    `json:"dmca_takedown"`
@@ -130,7 +132,7 @@ func (h *Handler) UpdateSong(c *fiber.Ctx) error {
 	// Snapshot before for diff
 	beforeMap, _, _ := h.songs.GetByID(id)
 
-	ok, err := h.songs.Update(id, req.Title, req.Artist, req.BaseChord, req.LyricsAndChord, req.ExternalLinks, req.DmcaTakedown, req.DmcaStatusNotes, req.TagNames, hasTagNames)
+	ok, err := h.songs.Update(id, req.Title, req.Artist, req.BaseChord, req.Bpm, req.LyricsAndChord, req.ExternalLinks, req.DmcaTakedown, req.DmcaStatusNotes, req.TagNames, hasTagNames)
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to update song")
 	}
