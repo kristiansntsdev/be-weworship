@@ -28,10 +28,10 @@ func (h *Handler) GetSongs(c *fiber.Ctx) error {
 	if page < 1 {
 		page = 1
 	}
-	// Default to all songs when limit is not provided.
-	limit := c.QueryInt("limit", 100000)
+	// Default to all songs when limit is not provided (mobile app compatibility).
+	limit := c.QueryInt("limit", 20)
 	if limit < 1 {
-		limit = 100000
+		limit = 20
 	}
 	if limit > 1000 {
 		limit = 1000
