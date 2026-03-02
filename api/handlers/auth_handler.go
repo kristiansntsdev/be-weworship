@@ -116,15 +116,38 @@ if detail.PostalCode.Valid {
 detailMap["postal_code"] = detail.PostalCode.String
 }
 }
+avatarURL, _ := h.users.GetAvatarURL(cl.UserID)
+var avatarAny any
+if avatarURL != "" {
+avatarAny = avatarURL
+}
 return utils.OK(c, 200, "Current user retrieved successfully", fiber.Map{
 "user": fiber.Map{
-"id":     cl.UserID,
-"name":   cl.Name,
-"email":  cl.Email,
-"role":   cl.Role,
-"detail": detailMap,
+"id":         cl.UserID,
+"name":       cl.Name,
+"email":      cl.Email,
+"role":       cl.Role,
+"avatar_url": avatarAny,
+"detail":     detailMap,
 },
 })
+}
+
+func (h *Handler) UpdateAvatar(c *fiber.Ctx) error {
+cl := middleware.GetClaims(c)
+var req struct {
+AvatarURL string `json:"avatar_url"`
+}
+if err := c.BodyParser(&req); err != nil {
+return utils.Fail(c, 400, "Invalid request body")
+}
+if req.AvatarURL == "" {
+return utils.Fail(c, 400, "avatar_url is required")
+}
+if err := h.users.UpdateAvatarURL(cl.UserID, req.AvatarURL); err != nil {
+return utils.Fail(c, 500, "Failed to update avatar")
+}
+return utils.OK(c, 200, "Avatar updated successfully", nil)
 }
 
 func (h *Handler) UpdateProfile(c *fiber.Ctx) error {

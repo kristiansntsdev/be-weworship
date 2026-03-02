@@ -210,14 +210,19 @@ return cl, nil
 }
 
 func mapUser(u models.User) map[string]any {
+var avatarURL any
+if u.AvatarURL.Valid {
+avatarURL = u.AvatarURL.String
+}
 return map[string]any{
-"id":       u.ID,
-"name":     u.Name,
-"email":    u.Email,
-"role":     u.Role,
-"provider": u.Provider,
-"verified": u.Verified,
-"status":   u.Status,
+"id":         u.ID,
+"name":       u.Name,
+"email":      u.Email,
+"role":       u.Role,
+"provider":   u.Provider,
+"verified":   u.Verified,
+"status":     u.Status,
+"avatar_url": avatarURL,
 }
 }
 

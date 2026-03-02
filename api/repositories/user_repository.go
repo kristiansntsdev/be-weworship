@@ -65,3 +65,17 @@ func (r *UserRepository) UpsertDetail(userID int, fullName, province, city, post
 	)
 	return err
 }
+
+func (r *UserRepository) FindByID(userID int) (*models.User, error) {
+var u models.User
+err := r.db.Get(&u, `SELECT id, name, email, role, provider, verified, status, avatar_url, "createdAt", "updatedAt" FROM users WHERE id = $1`, userID)
+if err != nil {
+return nil, err
+}
+return &u, nil
+}
+
+func (r *UserRepository) UpdateAvatarURL(userID int, avatarURL string) error {
+_, err := r.db.Exec(`UPDATE users SET avatar_url = $1, "updatedAt" = NOW() WHERE id = $2`, avatarURL, userID)
+return err
+}

@@ -35,3 +35,18 @@ return s.repo.GetDetail(userID)
 func (s *UserService) UpdateProfile(userID int, fullName, province, city, postalCode *string) error {
 return s.repo.UpsertDetail(userID, fullName, province, city, postalCode)
 }
+
+func (s *UserService) UpdateAvatarURL(userID int, avatarURL string) error {
+return s.repo.UpdateAvatarURL(userID, avatarURL)
+}
+
+func (s *UserService) GetAvatarURL(userID int) (string, error) {
+u, err := s.repo.FindByID(userID)
+if err != nil {
+return "", err
+}
+if u.AvatarURL.Valid {
+return u.AvatarURL.String, nil
+}
+return "", nil
+}
