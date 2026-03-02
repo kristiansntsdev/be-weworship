@@ -50,30 +50,34 @@ api.Post("/analytics/performance", h.RecordPerformance)
 api.Post("/analytics/session", h.RecordSession)
 
 // ── Auth-required routes ───────────────────────────────────────────────
-auth := api.Group("", h.authMW.RequireAuth)
-auth.Post("/auth/logout", func(c *fiber.Ctx) error { return utils.OK(c, 200, "Logout successful", nil) })
-auth.Get("/auth/me", h.GetMe)
-auth.Get("/auth/check-permission", h.CheckPermission)
+// NOTE: Do NOT use api.Group("", middleware) — in Fiber v2, an empty-prefix
+// group registers the middleware as a global Use() on all /api/* routes,
+// including public ones. Apply middleware inline per route instead.
+ra := h.authMW.RequireAuth
 
-auth.Post("/playlists", h.CreatePlaylist)
-auth.Get("/playlists", h.GetPlaylists)
-auth.Get("/playlists/:id", h.GetPlaylistByID)
-auth.Put("/playlists/:id", h.UpdatePlaylist)
-auth.Delete("/playlists/:id", h.DeletePlaylist)
-auth.Post("/playlists/:id/sharelink", h.GenerateSharelink)
-auth.Post("/playlists/join/:shareToken", h.JoinPlaylist)
-auth.Post("/playlists/:id/songs", h.AddSongsToPlaylist)
-auth.Post("/playlists/:id/songs/:songId", h.AddSongToPlaylistWithBaseChord)
-auth.Delete("/playlists/:id/song/:songId", h.RemoveSongFromPlaylist)
+api.Post("/auth/logout", ra, func(c *fiber.Ctx) error { return utils.OK(c, 200, "Logout successful", nil) })
+api.Get("/auth/me", ra, h.GetMe)
+api.Get("/auth/check-permission", ra, h.CheckPermission)
 
-auth.Get("/playlist-teams", h.GetMyTeams)
-auth.Get("/playlist-teams/:id", h.GetTeamByID)
-auth.Delete("/playlist-teams/:id/members/:user_id", h.RemoveMember)
-auth.Delete("/playlist-teams/:id", h.DeleteTeam)
-auth.Post("/playlist-teams/:id/leave", h.LeaveTeam)
+api.Post("/playlists", ra, h.CreatePlaylist)
+api.Get("/playlists", ra, h.GetPlaylists)
+api.Get("/playlists/:id", ra, h.GetPlaylistByID)
+api.Put("/playlists/:id", ra, h.UpdatePlaylist)
+api.Delete("/playlists/:id", ra, h.DeletePlaylist)
+api.Post("/playlists/:id/sharelink", ra, h.GenerateSharelink)
+api.Post("/playlists/join/:shareToken", ra, h.JoinPlaylist)
+api.Post("/playlists/:id/songs", ra, h.AddSongsToPlaylist)
+api.Post("/playlists/:id/songs/:songId", ra, h.AddSongToPlaylistWithBaseChord)
+api.Delete("/playlists/:id/song/:songId", ra, h.RemoveSongFromPlaylist)
+
+api.Get("/playlist-teams", ra, h.GetMyTeams)
+api.Get("/playlist-teams/:id", ra, h.GetTeamByID)
+api.Delete("/playlist-teams/:id/members/:user_id", ra, h.RemoveMember)
+api.Delete("/playlist-teams/:id", ra, h.DeleteTeam)
+api.Post("/playlist-teams/:id/leave", ra, h.LeaveTeam)
 
 // ── Admin routes ───────────────────────────────────────────────────────
-admin := auth.Group("/admin", h.authMW.RequireAdmin)
+admin := api.Group("/admin", ra, h.authMW.RequireAdmin)
 admin.Post("/songs", h.CreateSong)
 admin.Put("/songs/:id", h.UpdateSong)
 admin.Delete("/songs/:id", h.DeleteSong)
