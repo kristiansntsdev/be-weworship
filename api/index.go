@@ -38,6 +38,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, initErr.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Vercel serverless rewrites r.RequestURI to the function file path (e.g. /api/index.go),
+	// which strips the original path and query string. r.URL retains the original values.
+	if r.URL != nil {
+		r.RequestURI = r.URL.RequestURI()
+	}
 	adaptor.FiberApp(fapp)(w, r)
 }
 
