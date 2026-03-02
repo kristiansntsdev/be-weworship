@@ -30,7 +30,7 @@ func NewSongCache() *SongCache {
 	if err := client.Ping(ctx).Err(); err != nil {
 		return &SongCache{enabled: false}
 	}
-	return &SongCache{enabled: true, client: client, ttl: 5 * time.Minute}
+	return &SongCache{enabled: true, client: client, ttl: 2 * time.Hour}
 }
 
 func (c *SongCache) Enabled() bool {
