@@ -4,6 +4,7 @@ import (
 	"be-songbanks-v1/api/middleware"
 	"be-songbanks-v1/api/utils"
 	"bytes"
+	"strings"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -48,7 +49,7 @@ func (h *Handler) GetSongs(c *fiber.Ctx) error {
 	} else if v == "false" {
 		f := false; chordPro = &f
 	}
-	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), hasLink, chordPro)
+	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), hasLink, chordPro, strings.Contains(c.Get("User-Agent"), "okhttp"))
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to retrieve songs")
 	}

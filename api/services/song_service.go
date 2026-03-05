@@ -105,9 +105,9 @@ func (s *SongService) HomeStats() (map[string]any, error) {
 	}, nil
 }
 
-func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool) ([]map[string]any, map[string]any, error) {
+func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool, useCache bool) ([]map[string]any, map[string]any, error) {
 	cacheKey := buildSongsCacheKey(page, limit, search, baseChord, sortBy, sortOrder, tagIDs)
-	if s.cache != nil && s.cache.Enabled() {
+	if useCache && s.cache != nil && s.cache.Enabled() {
 		var cached struct {
 			Data       []map[string]any `json:"data"`
 			Pagination map[string]any   `json:"pagination"`
@@ -117,6 +117,8 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 			return cached.Data, cached.Pagination, nil
 		}
 		log.Printf("[songs-cache] miss key=%s", cacheKey)
+	} else if !useCache {
+		log.Printf("[songs-cache] bypassed (non-mobile) key=%s", cacheKey)
 	} else {
 		log.Printf("[songs-cache] disabled key=%s", cacheKey)
 	}
@@ -172,7 +174,7 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 		"hasPrevPage":  page > 1,
 	}
 
-	if s.cache != nil && s.cache.Enabled() {
+	if useCache && s.cache != nil && s.cache.Enabled() {
 		s.cache.Set(cacheKey, map[string]any{"data": data, "pagination": pagination})
 		log.Printf("[songs-cache] set key=%s", cacheKey)
 	}
