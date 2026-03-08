@@ -2,13 +2,13 @@ package services
 
 import (
 	"be-songbanks-v1/api/models"
+	"be-songbanks-v1/api/platform"
+	"be-songbanks-v1/api/repositories"
+	"be-songbanks-v1/api/utils"
 	"database/sql"
 	"fmt"
 	"strings"
 	"time"
-
-	"be-songbanks-v1/api/repositories"
-	"be-songbanks-v1/api/utils"
 )
 
 type PlaylistService struct {
@@ -16,10 +16,11 @@ type PlaylistService struct {
 	teams     *repositories.TeamRepository
 	songs     *repositories.SongRepository
 	clientURL string
+	live      *platform.LiveCache
 }
 
-func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.TeamRepository, s *repositories.SongRepository, clientURL string) *PlaylistService {
-	return &PlaylistService{playlists: p, teams: t, songs: s, clientURL: clientURL}
+func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.TeamRepository, s *repositories.SongRepository, clientURL string, live *platform.LiveCache) *PlaylistService {
+	return &PlaylistService{playlists: p, teams: t, songs: s, clientURL: clientURL, live: live}
 }
 
 func (s *PlaylistService) Create(userID int, name string, songs []int) (map[string]any, int, error) {
@@ -315,4 +316,46 @@ func (s *PlaylistService) loadWithAccess(playlistID, userID int) (*models.Playli
 		return pl, "member", nil
 	}
 	return nil, "", sql.ErrNoRows
+}
+
+// ── Live Session ──────────────────────────────────────────────────────────────
+
+func (s *PlaylistService) StartLive(playlistID, userID int) error {
+	if s.live == nil {
+		return fmt.Errorf("live sessions unavailable")
+	}
+	ok, err := s.playlists.CanManage(playlistID, userID)
+	if err != nil || !ok {
+		return fmt.Errorf("access denied")
+	}
+	return s.live.StartSession(playlistID, userID)
+}
+
+func (s *PlaylistService) EndLive(playlistID, userID int) error {
+	if s.live == nil {
+		return nil
+	}
+	ok, err := s.playlists.CanManage(playlistID, userID)
+	if err != nil || !ok {
+		return fmt.Errorf("access denied")
+	}
+	return s.live.EndSession(playlistID)
+}
+
+func (s *PlaylistService) UpdateLiveState(playlistID, userID, songIndex int, scrollRatio float64) error {
+	if s.live == nil {
+		return fmt.Errorf("live sessions unavailable")
+	}
+	ok, err := s.playlists.CanManage(playlistID, userID)
+	if err != nil || !ok {
+		return fmt.Errorf("access denied")
+	}
+	return s.live.UpdateState(playlistID, songIndex, scrollRatio)
+}
+
+func (s *PlaylistService) GetLiveState(playlistID int) (*platform.LiveState, error) {
+	if s.live == nil {
+		return nil, nil
+	}
+	return s.live.GetState(playlistID)
 }
