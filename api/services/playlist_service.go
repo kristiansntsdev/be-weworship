@@ -12,14 +12,15 @@ import (
 )
 
 type PlaylistService struct {
-	playlists *repositories.PlaylistRepository
-	teams     *repositories.TeamRepository
-	songs     *repositories.SongRepository
-	clientURL string
+	playlists    *repositories.PlaylistRepository
+	teams        *repositories.TeamRepository
+	songs        *repositories.SongRepository
+	clientURL    string
+	mobileScheme string
 }
 
-func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.TeamRepository, s *repositories.SongRepository, clientURL string) *PlaylistService {
-	return &PlaylistService{playlists: p, teams: t, songs: s, clientURL: clientURL}
+func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.TeamRepository, s *repositories.SongRepository, clientURL, mobileScheme string) *PlaylistService {
+	return &PlaylistService{playlists: p, teams: t, songs: s, clientURL: clientURL, mobileScheme: mobileScheme}
 }
 
 func (s *PlaylistService) Create(userID int, name string, songs []int) (map[string]any, int, error) {
@@ -122,7 +123,14 @@ func (s *PlaylistService) GenerateSharelink(playlistID, userID int) (map[string]
 	}
 
 	token := fmt.Sprintf("%d-%d", playlistID, time.Now().UnixNano())
-	link := strings.TrimRight(s.clientURL, "/") + "/playlist/join/" + token
+
+	// Prefer deep link (opens app directly); fall back to web URL
+	var link string
+	if s.mobileScheme != "" {
+		link = fmt.Sprintf("%s://playlist/%s/join", strings.TrimRight(s.mobileScheme, "/"), token)
+	} else {
+		link = strings.TrimRight(s.clientURL, "/") + "/playlist/join/" + token
+	}
 
 	team, err := s.teams.FindByPlaylistID(playlistID)
 	if err != nil {
