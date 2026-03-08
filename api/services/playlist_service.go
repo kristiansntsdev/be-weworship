@@ -154,6 +154,7 @@ func (s *PlaylistService) Join(shareToken string, userID int) (map[string]any, i
 		return nil, 500, err
 	}
 	if ownerID == userID {
+		s.playlists.RecordShareEvent(playlistID)
 		return map[string]any{"playlist_id": playlistID}, 201, nil
 	}
 
@@ -180,6 +181,7 @@ func (s *PlaylistService) Join(shareToken string, userID int) (map[string]any, i
 		}
 	}
 
+	s.playlists.RecordShareEvent(playlistID)
 	return map[string]any{"playlist_id": playlistID, "playlist_team_id": teamID.Int64}, 201, nil
 }
 

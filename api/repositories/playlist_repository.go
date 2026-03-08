@@ -15,7 +15,29 @@ type PlaylistRepository struct {
 }
 
 func NewPlaylistRepository(db *sqlx.DB) *PlaylistRepository {
+	db.Exec(`CREATE TABLE IF NOT EXISTS playlist_share_events (
+		id          SERIAL PRIMARY KEY,
+		playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+		"createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+	)`)
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_pse_created ON playlist_share_events ("createdAt")`)
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_pse_playlist ON playlist_share_events (playlist_id)`)
 	return &PlaylistRepository{db: db}
+}
+
+// RecordShareEvent records a share access (join via link) for weekly stats.
+func (r *PlaylistRepository) RecordShareEvent(playlistID int) {
+	r.db.Exec(r.db.Rebind(`INSERT INTO playlist_share_events (playlist_id) VALUES (?)`), playlistID)
+}
+
+// CountShareEventsThisWeek returns the total join-via-link events since Monday 00:00 of the current week.
+func (r *PlaylistRepository) CountShareEventsThisWeek() (int, error) {
+	var count int
+	err := r.db.Get(&count, `
+		SELECT COUNT(*) FROM playlist_share_events
+		WHERE "createdAt" >= DATE_TRUNC('week', NOW())
+	`)
+	return count, err
 }
 
 func (r *PlaylistRepository) CountShareable() (int, error) {

@@ -104,10 +104,15 @@ func (s *SongService) HomeStats() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	weeklyShareCount, err := s.playlists.CountShareEventsThisWeek()
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"song_count":               songCount,
 		"artist_count":             len(artists),
 		"shareable_playlist_count": shareableCount,
+		"weekly_share_count":       weeklyShareCount,
 	}, nil
 }
 

@@ -164,3 +164,12 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs ("createdAt" DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity  ON audit_logs (entity_type, entity_id);
+
+-- ── Playlist Share Events ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS playlist_share_events (
+    id          SERIAL PRIMARY KEY,
+    playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_pse_created  ON playlist_share_events ("createdAt");
+CREATE INDEX IF NOT EXISTS idx_pse_playlist ON playlist_share_events (playlist_id);
