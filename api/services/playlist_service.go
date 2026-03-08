@@ -211,6 +211,40 @@ func (s *PlaylistService) AddSongWithBaseChord(playlistID, userID, songID int, b
 	return s.AddSongs(playlistID, userID, []int{songID})
 }
 
+func (s *PlaylistService) ReorderSongs(playlistID, userID int, songIDs []int) (int, error) {
+	canManage, err := s.playlists.CanManage(playlistID, userID)
+	if err != nil {
+		return 500, err
+	}
+	if !canManage {
+		return 403, fmt.Errorf("access denied")
+	}
+	pl, err := s.playlists.GetByID(playlistID)
+	if err != nil || pl == nil {
+		return 404, fmt.Errorf("playlist not found")
+	}
+	existing := utils.ParseIntSlice(pl.SongsRaw.String)
+	existingSet := make(map[int]struct{}, len(existing))
+	for _, id := range existing {
+		existingSet[id] = struct{}{}
+	}
+	// Only keep IDs that actually exist in the playlist, in given order
+	ordered := make([]int, 0, len(songIDs))
+	seen := make(map[int]struct{})
+	for _, id := range songIDs {
+		if _, ok := existingSet[id]; ok {
+			if _, dup := seen[id]; !dup {
+				ordered = append(ordered, id)
+				seen[id] = struct{}{}
+			}
+		}
+	}
+	if err := s.playlists.SetSongs(playlistID, ordered); err != nil {
+		return 500, err
+	}
+	return 200, nil
+}
+
 func (s *PlaylistService) RemoveSong(playlistID, userID, songID int) (int, error) {
 	canManage, err := s.playlists.CanManage(playlistID, userID)
 	if err != nil {

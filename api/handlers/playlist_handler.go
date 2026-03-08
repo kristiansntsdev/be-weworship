@@ -148,6 +148,26 @@ func (h *Handler) AddSongToPlaylistWithBaseChord(c *fiber.Ctx) error {
 	return utils.OK(c, 200, "Song added to playlist with base chord successfully", fiber.Map{"playlist_id": id, "song_id": songID, "base_chord": req.BaseChord})
 }
 
+
+func (h *Handler) ReorderPlaylistSongs(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	var req struct {
+		SongIDs []int `json:"song_ids"`
+	}
+	if err := c.BodyParser(&req); err != nil || len(req.SongIDs) == 0 {
+		return utils.Fail(c, 400, "song_ids array required")
+	}
+	status, err := h.playlists.ReorderSongs(id, cl.UserID, req.SongIDs)
+	if err != nil {
+		return utils.Fail(c, status, err.Error())
+	}
+	return utils.OK(c, 200, "Playlist songs reordered", fiber.Map{"playlist_id": id})
+}
+
 func (h *Handler) RemoveSongFromPlaylist(c *fiber.Ctx) error {
 	cl := middleware.GetClaims(c)
 	id, err := parseID(c, "id")
