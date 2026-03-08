@@ -71,7 +71,7 @@ func buildApp() (*fiber.App, error) {
 	})
 	tagSvc := services.NewTagService(tagRepo)
 	songSvc := services.NewSongService(songRepo, tagRepo, playlistRepo, songCache)
-	playlistSvc := services.NewPlaylistService(playlistRepo, teamRepo, songRepo, ctx.ClientURL, os.Getenv("MOBILE_SCHEME"))
+	playlistSvc := services.NewPlaylistService(playlistRepo, teamRepo, songRepo, ctx.ClientURL)
 	teamSvc := services.NewTeamService(teamRepo, authRepo, playlistRepo)
 	userSvc := services.NewUserService(userRepo)
 	analyticsSvc := services.NewAnalyticsService(analyticsRepo)

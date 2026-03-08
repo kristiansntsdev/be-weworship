@@ -31,6 +31,9 @@ app.Get("/", func(c *fiber.Ctx) error {
 return utils.OK(c, 200, "Welcome to WeWorship API", fiber.Map{"version": "3.0.0"})
 })
 
+// ── Playlist share redirect (web URL → deep link) ───────────────────────
+app.Get("/pl/:token", h.PlaylistShareRedirect)
+
 api := app.Group("/api")
 
 // ── Public routes ──────────────────────────────────────────────────────
