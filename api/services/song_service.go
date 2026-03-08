@@ -13,13 +13,14 @@ import (
 )
 
 type SongService struct {
-	songs *repositories.SongRepository
-	tags  *repositories.TagRepository
-	cache *platform.SongCache
+	songs     *repositories.SongRepository
+	tags      *repositories.TagRepository
+	playlists *repositories.PlaylistRepository
+	cache     *platform.SongCache
 }
 
-func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories.TagRepository, cache *platform.SongCache) *SongService {
-	return &SongService{songs: songRepo, tags: tagRepo, cache: cache}
+func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories.TagRepository, playlistRepo *repositories.PlaylistRepository, cache *platform.SongCache) *SongService {
+	return &SongService{songs: songRepo, tags: tagRepo, playlists: playlistRepo, cache: cache}
 }
 
 // parseExternalLinks parses a JSON external_links string into individual URL fields.
@@ -99,9 +100,14 @@ func (s *SongService) HomeStats() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	shareableCount, err := s.playlists.CountShareable()
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
-		"song_count":   songCount,
-		"artist_count": len(artists),
+		"song_count":               songCount,
+		"artist_count":             len(artists),
+		"shareable_playlist_count": shareableCount,
 	}, nil
 }
 

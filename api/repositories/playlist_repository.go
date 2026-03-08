@@ -18,6 +18,12 @@ func NewPlaylistRepository(db *sqlx.DB) *PlaylistRepository {
 	return &PlaylistRepository{db: db}
 }
 
+func (r *PlaylistRepository) CountShareable() (int, error) {
+	var count int
+	err := r.db.Get(&count, `SELECT COUNT(*) FROM playlists WHERE is_shared=1`)
+	return count, err
+}
+
 func (r *PlaylistRepository) NameExistsForUser(userID int, name string) (bool, error) {
 	var count int
 	if err := r.db.Get(&count, r.db.Rebind(`SELECT COUNT(*) FROM playlists WHERE user_id=? AND LOWER(playlist_name)=LOWER(?)`), userID, name); err != nil {
