@@ -368,6 +368,34 @@ func (s *SongService) Delete(songID int) (bool, error) {
 	return affected > 0, nil
 }
 
+func (s *SongService) ExportSongs() ([]map[string]any, error) {
+	rows, err := s.songs.ListAllChordPro()
+	if err != nil {
+		return nil, err
+	}
+	data := make([]map[string]any, 0, len(rows))
+	for _, r := range rows {
+		sp, yt, am := parseExternalLinks(r.ExternalLinks.String)
+		data = append(data, map[string]any{
+			"id":                r.ID,
+			"title":             r.Title,
+			"artist":            utils.ParseArtists(r.Artist.String),
+			"base_chord":        utils.NullableString(r.BaseChord),
+			"bpm": func() any {
+				if r.Bpm.Valid {
+					return r.Bpm.Int64
+				}
+				return nil
+			}(),
+			"lyrics_and_chords": utils.NullableString(r.LyricsAndChord),
+			"spotify_url":       sp,
+			"youtube_url":       yt,
+			"apple_music_url":   am,
+		})
+	}
+	return data, nil
+}
+
 func (s *SongService) assignTags(songID int, names []string) error {
 	for _, raw := range names {
 		name := strings.TrimSpace(raw)

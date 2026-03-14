@@ -154,3 +154,9 @@ func (r *SongRepository) Count() (int, error) {
 	err := r.db.Get(&n, `SELECT COUNT(*) FROM songs`)
 	return n, err
 }
+
+func (r *SongRepository) ListAllChordPro() ([]models.Song, error) {
+	rows := []models.Song{}
+	err := r.db.Select(&rows, `SELECT id,slug,title,artist,base_chord,bpm,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt" FROM songs WHERE (lyrics_and_chords LIKE '%[%' AND lyrics_and_chords NOT LIKE '%<span%') AND dmca_takedown = false ORDER BY title ASC`)
+	return rows, err
+}

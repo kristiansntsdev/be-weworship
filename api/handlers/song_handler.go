@@ -74,6 +74,14 @@ func isMobileUserAgent(ua string) bool {
 		strings.Contains(ua, "reactnative")
 }
 
+func (h *Handler) GetSongsExport(c *fiber.Ctx) error {
+	data, err := h.songs.ExportSongs()
+	if err != nil {
+		return utils.Fail(c, 500, "Failed to export songs")
+	}
+	return utils.OK(c, 200, "Songs exported successfully", data)
+}
+
 func (h *Handler) GetSongByID(c *fiber.Ctx) error {
 	identifier := c.Params("id")
 	// Try numeric ID first, fall back to slug lookup

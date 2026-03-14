@@ -32,6 +32,7 @@ return utils.OK(c, 200, "Welcome to WeWorship API", fiber.Map{"version": "3.0.0"
 })
 
 api := app.Group("/api")
+ra := h.authMW.RequireAuth
 
 // ── Public routes ──────────────────────────────────────────────────────
 api.Post("/auth/register", h.RegisterUser)
@@ -41,6 +42,7 @@ api.Get("/auth/google/callback", h.GoogleCallback)
 api.Get("/home", h.GetHome)
 api.Get("/artists", h.GetArtists)
 api.Get("/songs", h.GetSongs)
+api.Get("/songs/export", ra, h.GetSongsExport)
 api.Get("/songs/:id", h.GetSongByID)
 api.Get("/tags", h.GetTags)
 api.Post("/tags/get-or-create", h.GetOrCreateTag)
@@ -53,7 +55,6 @@ api.Post("/analytics/session", h.RecordSession)
 // NOTE: Do NOT use api.Group("", middleware) — in Fiber v2, an empty-prefix
 // group registers the middleware as a global Use() on all /api/* routes,
 // including public ones. Apply middleware inline per route instead.
-ra := h.authMW.RequireAuth
 
 api.Post("/auth/logout", ra, func(c *fiber.Ctx) error { return utils.OK(c, 200, "Logout successful", nil) })
 api.Get("/auth/me", ra, h.GetMe)
