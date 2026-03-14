@@ -117,7 +117,7 @@ func (s *SongService) HomeStats() (map[string]any, error) {
 }
 
 func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool, useCache bool) ([]map[string]any, map[string]any, error) {
-	cacheKey := buildSongsCacheKey(page, limit, search, baseChord, sortBy, sortOrder, tagIDs)
+	cacheKey := buildSongsCacheKey(page, limit, search, baseChord, sortBy, sortOrder, tagIDs, hasLink, chordPro)
 	if useCache && s.cache != nil && s.cache.Enabled() {
 		var cached struct {
 			Data       []map[string]any `json:"data"`
@@ -157,12 +157,17 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 		}
 		sp, yt, am := parseExternalLinks(r.ExternalLinks.String)
 		data = append(data, map[string]any{
-			"id":                r.ID,
-			"slug":              utils.NullableString(r.Slug),
-			"title":             r.Title,
-			"artist":            utils.ParseArtists(r.Artist.String),
-			"base_chord":        utils.NullableString(r.BaseChord),
-			"bpm":               func() any { if r.Bpm.Valid { return r.Bpm.Int64 }; return nil }(),
+			"id":         r.ID,
+			"slug":       utils.NullableString(r.Slug),
+			"title":      r.Title,
+			"artist":     utils.ParseArtists(r.Artist.String),
+			"base_chord": utils.NullableString(r.BaseChord),
+			"bpm": func() any {
+				if r.Bpm.Valid {
+					return r.Bpm.Int64
+				}
+				return nil
+			}(),
 			"lyrics_and_chords": utils.NullableString(r.LyricsAndChord),
 			"external_links":    utils.NullableString(r.ExternalLinks),
 			"spotify_url":       sp,
@@ -207,12 +212,17 @@ func (s *SongService) GetByID(id int) (map[string]any, bool, error) {
 	}
 	sp, yt, am := parseExternalLinks(row.ExternalLinks.String)
 	return map[string]any{
-		"id":                row.ID,
-		"slug":              utils.NullableString(row.Slug),
-		"title":             row.Title,
-		"artist":            utils.ParseArtists(row.Artist.String),
-		"base_chord":        utils.NullableString(row.BaseChord),
-		"bpm":               func() any { if row.Bpm.Valid { return row.Bpm.Int64 }; return nil }(),
+		"id":         row.ID,
+		"slug":       utils.NullableString(row.Slug),
+		"title":      row.Title,
+		"artist":     utils.ParseArtists(row.Artist.String),
+		"base_chord": utils.NullableString(row.BaseChord),
+		"bpm": func() any {
+			if row.Bpm.Valid {
+				return row.Bpm.Int64
+			}
+			return nil
+		}(),
 		"lyrics_and_chords": utils.NullableString(row.LyricsAndChord),
 		"external_links":    utils.NullableString(row.ExternalLinks),
 		"spotify_url":       sp,
@@ -241,12 +251,17 @@ func (s *SongService) GetBySlug(slug string) (map[string]any, bool, error) {
 	}
 	sp2, yt2, am2 := parseExternalLinks(row.ExternalLinks.String)
 	return map[string]any{
-		"id":                row.ID,
-		"slug":              utils.NullableString(row.Slug),
-		"title":             row.Title,
-		"artist":            utils.ParseArtists(row.Artist.String),
-		"base_chord":        utils.NullableString(row.BaseChord),
-		"bpm":               func() any { if row.Bpm.Valid { return row.Bpm.Int64 }; return nil }(),
+		"id":         row.ID,
+		"slug":       utils.NullableString(row.Slug),
+		"title":      row.Title,
+		"artist":     utils.ParseArtists(row.Artist.String),
+		"base_chord": utils.NullableString(row.BaseChord),
+		"bpm": func() any {
+			if row.Bpm.Valid {
+				return row.Bpm.Int64
+			}
+			return nil
+		}(),
 		"lyrics_and_chords": utils.NullableString(row.LyricsAndChord),
 		"external_links":    utils.NullableString(row.ExternalLinks),
 		"spotify_url":       sp2,
@@ -379,7 +394,7 @@ func (s *SongService) assignTags(songID int, names []string) error {
 	return nil
 }
 
-func buildSongsCacheKey(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int) string {
+func buildSongsCacheKey(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool) string {
 	ids := append([]int(nil), tagIDs...)
 	sort.Ints(ids)
 	tagPart := ""
@@ -389,6 +404,15 @@ func buildSongsCacheKey(page, limit int, search, baseChord, sortBy, sortOrder st
 		}
 		tagPart += fmt.Sprintf("%d", id)
 	}
-	return fmt.Sprintf("songs:list:page=%d:limit=%d:search=%s:base=%s:sortBy=%s:sortOrder=%s:tags=%s",
-		page, limit, strings.TrimSpace(search), strings.TrimSpace(baseChord), sortBy, strings.ToUpper(sortOrder), tagPart)
+	boolPart := func(v *bool) string {
+		if v == nil {
+			return "any"
+		}
+		if *v {
+			return "true"
+		}
+		return "false"
+	}
+	return fmt.Sprintf("songs:list:page=%d:limit=%d:search=%s:base=%s:sortBy=%s:sortOrder=%s:tags=%s:hasLink=%s:chordPro=%s",
+		page, limit, strings.TrimSpace(search), strings.TrimSpace(baseChord), sortBy, strings.ToUpper(sortOrder), tagPart, boolPart(hasLink), boolPart(chordPro))
 }

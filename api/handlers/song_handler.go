@@ -4,8 +4,8 @@ import (
 	"be-songbanks-v1/api/middleware"
 	"be-songbanks-v1/api/utils"
 	"bytes"
-	"strings"
 	"github.com/gofiber/fiber/v2"
+	"strings"
 )
 
 func (h *Handler) GetHome(c *fiber.Ctx) error {
@@ -39,21 +39,39 @@ func (h *Handler) GetSongs(c *fiber.Ctx) error {
 	}
 	var hasLink *bool
 	if v := c.Query("has_link"); v == "true" {
-		t := true; hasLink = &t
+		t := true
+		hasLink = &t
 	} else if v == "false" {
-		f := false; hasLink = &f
+		f := false
+		hasLink = &f
 	}
 	var chordPro *bool
 	if v := c.Query("chordpro"); v == "true" {
-		t := true; chordPro = &t
+		t := true
+		chordPro = &t
 	} else if v == "false" {
-		f := false; chordPro = &f
+		f := false
+		chordPro = &f
 	}
-	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), hasLink, chordPro, strings.Contains(c.Get("User-Agent"), "okhttp"))
+	isMobileClient := isMobileUserAgent(c.Get("User-Agent"))
+	// Mobile app should only receive songs already in ChordPro format.
+	if chordPro == nil && isMobileClient {
+		t := true
+		chordPro = &t
+	}
+	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), hasLink, chordPro, isMobileClient)
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to retrieve songs")
 	}
 	return c.JSON(fiber.Map{"code": 200, "message": "Songs retrieved successfully", "data": data, "pagination": pagination})
+}
+
+func isMobileUserAgent(ua string) bool {
+	ua = strings.ToLower(ua)
+	return strings.Contains(ua, "okhttp") ||
+		strings.Contains(ua, "cfnetwork") ||
+		strings.Contains(ua, "expo") ||
+		strings.Contains(ua, "reactnative")
 }
 
 func (h *Handler) GetSongByID(c *fiber.Ctx) error {
@@ -188,13 +206,13 @@ func (h *Handler) DeleteSong(c *fiber.Ctx) error {
 }
 
 func strVal(m map[string]any, key string) string {
-if m == nil {
-return ""
-}
-if v, ok := m[key]; ok {
-if s, ok := v.(string); ok {
-return s
-}
-}
-return ""
+	if m == nil {
+		return ""
+	}
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
 }
