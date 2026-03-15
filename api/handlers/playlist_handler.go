@@ -250,3 +250,11 @@ return utils.OK(c, 200, "Live state", fiber.Map{
 "updated_at":     state.UpdatedAt,
 })
 }
+
+func (h *Handler) GetPlaylistPreview(c *fiber.Ctx) error {
+	data, status, err := h.playlists.GetPreview(c.Params("shareToken"))
+	if err != nil {
+		return utils.Fail(c, status, err.Error())
+	}
+	return utils.OK(c, 200, "Playlist preview", data)
+}

@@ -122,6 +122,29 @@ func (r *PlaylistRepository) FindByShareToken(shareToken string) (playlistID, ow
 	return
 }
 
+type PlaylistPreview struct {
+	Name      string `db:"playlist_name"`
+	OwnerName string `db:"owner_name"`
+	SongsRaw  string `db:"songs"`
+}
+
+func (r *PlaylistRepository) GetPreviewByShareToken(shareToken string) (*PlaylistPreview, error) {
+	var p PlaylistPreview
+	err := r.db.QueryRowx(r.db.Rebind(`
+		SELECT p.playlist_name, u.name AS owner_name, COALESCE(p.songs,'') AS songs
+		FROM playlists p
+		JOIN users u ON u.id = p.user_id
+		WHERE p.share_token=? AND p.is_shared=1
+	`), shareToken).StructScan(&p)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 func (r *PlaylistRepository) SetTeamID(playlistID int, teamID int64) error {
 	_, err := r.db.Exec(r.db.Rebind(`UPDATE playlists SET playlist_team_id=?,"updatedAt"=NOW() WHERE id=?`), teamID, playlistID)
 	return err

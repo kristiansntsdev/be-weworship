@@ -359,3 +359,19 @@ func (s *PlaylistService) GetLiveState(playlistID int) (*platform.LiveState, err
 	}
 	return s.live.GetState(playlistID)
 }
+
+func (s *PlaylistService) GetPreview(shareToken string) (map[string]any, int, error) {
+	p, err := s.playlists.GetPreviewByShareToken(shareToken)
+	if err != nil {
+		return nil, 500, err
+	}
+	if p == nil {
+		return nil, 404, fmt.Errorf("invite link is invalid or the playlist is no longer shared")
+	}
+	songCount := len(utils.ParseIntSlice(p.SongsRaw))
+	return map[string]any{
+		"playlist_name": p.Name,
+		"owner_name":    p.OwnerName,
+		"song_count":    songCount,
+	}, 200, nil
+}
