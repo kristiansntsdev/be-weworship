@@ -37,20 +37,47 @@ func (s *TeamService) GetByID(teamID int) (map[string]any, int, error) {
 	if team == nil {
 		return nil, 404, fmt.Errorf("playlist team not found")
 	}
-	leader, _ := s.users.FindByID(team.LeadID)
-	members := utils.ParseIntSlice(team.MembersRaw.String)
-	memberRows := []map[string]any{}
-	for _, id := range members {
-		u, err := s.users.FindByID(id)
-		if err == nil && u != nil {
-			memberRows = append(memberRows, map[string]any{"id": u.ID, "name": u.Name, "email": u.Email})
+
+	memberIDs := utils.ParseIntSlice(team.MembersRaw.String)
+
+	// Fetch all users (leader + members) in a single query
+	allIDs := make([]int, 0, len(memberIDs)+1)
+	allIDs = append(allIDs, team.LeadID)
+	for _, id := range memberIDs {
+		if id != team.LeadID {
+			allIDs = append(allIDs, id)
 		}
 	}
-	var leaderMap any
-	if leader != nil {
-		leaderMap = map[string]any{"id": leader.ID, "name": leader.Name, "email": leader.Email}
+	users, err := s.users.FindManyByIDs(allIDs)
+	if err != nil {
+		return nil, 500, err
 	}
-	return map[string]any{"id": team.ID, "playlist_id": team.PlaylistID, "lead_id": team.LeadID, "leader": leaderMap, "members": memberRows, "createdAt": utils.NullableTime(team.CreatedAt), "updatedAt": utils.NullableTime(team.UpdatedAt)}, 200, nil
+	userMap := make(map[int]map[string]any, len(users))
+	for _, u := range users {
+		userMap[u.ID] = map[string]any{"id": u.ID, "name": u.Name, "email": u.Email}
+	}
+
+	var leaderMap any
+	if lm, ok := userMap[team.LeadID]; ok {
+		leaderMap = lm
+	}
+
+	memberRows := make([]map[string]any, 0, len(memberIDs))
+	for _, id := range memberIDs {
+		if um, ok := userMap[id]; ok {
+			memberRows = append(memberRows, um)
+		}
+	}
+
+	return map[string]any{
+		"id":          team.ID,
+		"playlist_id": team.PlaylistID,
+		"lead_id":     team.LeadID,
+		"leader":      leaderMap,
+		"members":     memberRows,
+		"createdAt":   utils.NullableTime(team.CreatedAt),
+		"updatedAt":   utils.NullableTime(team.UpdatedAt),
+	}, 200, nil
 }
 
 func (s *TeamService) RemoveMember(teamID, memberID, requesterID int) (int, error) {

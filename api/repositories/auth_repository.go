@@ -40,6 +40,20 @@ func (r *AuthRepository) FindByID(id int) (*models.UserBasic, error) {
 	return &u, nil
 }
 
+// FindManyByIDs fetches multiple users in a single query.
+func (r *AuthRepository) FindManyByIDs(ids []int) ([]models.UserBasic, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	query, args, err := sqlx.In(`SELECT id,name,email FROM users WHERE id IN (?)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	var users []models.UserBasic
+	err = r.db.Select(&users, r.db.Rebind(query), args...)
+	return users, err
+}
+
 // FindOrCreateGoogleUser upserts a user authenticated via Google OAuth.
 func (r *AuthRepository) FindOrCreateGoogleUser(email, name, providerID string) (*models.User, error) {
 	existing, err := r.FindByEmail(email)
