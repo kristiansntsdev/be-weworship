@@ -98,7 +98,12 @@ if err != nil {
 return "", err
 }
 
-if state == "mobile" {
+if state == "mobile" || strings.HasPrefix(state, "mobile|") {
+if strings.HasPrefix(state, "mobile|") {
+// Expo Go passes its own redirect URI (exp://...) encoded after the pipe
+redirectURI := strings.TrimPrefix(state, "mobile|")
+return redirectURI + "?token=" + token, nil
+}
 scheme := s.google.MobileScheme
 if scheme == "" {
 scheme = "weworship"

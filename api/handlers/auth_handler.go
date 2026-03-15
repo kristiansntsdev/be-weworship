@@ -70,6 +70,7 @@ func injectDetail(h *Handler, data map[string]any) {
 
 // GoogleLogin redirects the browser to Google's OAuth consent screen.
 // Accepts ?client=mobile or ?state=mobile (mobile app uses ?state=mobile).
+// Mobile may pass ?redirect_uri=<encoded> to override deep-link scheme (e.g. Expo Go uses exp://).
 func (h *Handler) GoogleLogin(c *fiber.Ctx) error {
 client := c.Query("client", "")
 if client == "" {
@@ -78,7 +79,13 @@ client = c.Query("state", "web")
 if client != "web" && client != "mobile" {
 client = "web"
 }
-return c.Redirect(h.auth.GoogleAuthURL(client), fiber.StatusFound)
+state := client
+if client == "mobile" {
+if override := c.Query("redirect_uri", ""); override != "" {
+state = "mobile|" + override
+}
+}
+return c.Redirect(h.auth.GoogleAuthURL(state), fiber.StatusFound)
 }
 
 // GoogleCallback handles the redirect back from Google after the user consents.
