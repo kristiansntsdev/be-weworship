@@ -78,7 +78,7 @@ func (s *PlaylistService) GetByIDWithAccess(playlistID, userID int) (map[string]
 	if pl.IsShared {
 		resp["sharable_link"] = utils.NullableString(pl.ShareableURL)
 		resp["share_token"] = utils.NullableString(pl.ShareToken)
-		resp["playlist_team_id"] = pl.PlaylistTeamID
+		resp["playlist_team_id"] = pl.PlaylistTeamID.Int64
 		resp["is_shared"] = pl.IsShared
 		resp["is_locked"] = pl.IsLocked
 	}
