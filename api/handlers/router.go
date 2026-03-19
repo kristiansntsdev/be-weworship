@@ -131,6 +131,17 @@ return 0, fmt.Errorf("invalid %s", key)
 return v, nil
 }
 
+// filterOutUserID returns a new slice with the given userID removed.
+func filterOutUserID(ids []int, exclude int) []int {
+	out := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id != exclude {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func parseInt(s string) (int, error) {
 return strconv.Atoi(s)
 }

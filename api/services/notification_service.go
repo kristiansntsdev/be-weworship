@@ -50,6 +50,62 @@ func (s *NotificationService) NotifyNewSong(title string) {
 	}()
 }
 
+// NotifyMemberLeft sends a push notification to the playlist owner when a
+// member leaves their team.
+func (s *NotificationService) NotifyMemberLeft(playlistName, memberName string, ownerID int) {
+	if s.fcm == nil || ownerID == 0 {
+		return
+	}
+	go func() {
+		tokens, err := s.repo.GetTokensByUserIDs([]int{ownerID})
+		if err != nil {
+			log.Printf("[notification] NotifyMemberLeft GetTokens failed: %v", err)
+			return
+		}
+		ctx := context.Background()
+		for _, token := range tokens {
+			if err := s.fcm.SendToToken(ctx, token,
+				"👋 Member Left",
+				memberName+" left your \""+playlistName+"\" playlist.",
+				map[string]string{"type": "playlist_update", "playlist": playlistName},
+			); err != nil {
+				log.Printf("[notification] NotifyMemberLeft SendToToken failed for token %s: %v", token, err)
+			}
+		}
+	}()
+}
+
+// NotifySongRequestUpdated sends a push notification to the requester when
+// their song request status changes to approved or rejected.
+func (s *NotificationService) NotifySongRequestUpdated(songTitle, status string, requesterID int) {
+	if s.fcm == nil || requesterID == 0 {
+		return
+	}
+	go func() {
+		tokens, err := s.repo.GetTokensByUserIDs([]int{requesterID})
+		if err != nil {
+			log.Printf("[notification] NotifySongRequestUpdated GetTokens failed: %v", err)
+			return
+		}
+		var title, body string
+		if status == "approved" {
+			title = "✅ Song Request Approved"
+			body = "Your request for \"" + songTitle + "\" has been approved!"
+		} else {
+			title = "❌ Song Request Rejected"
+			body = "Your request for \"" + songTitle + "\" was not approved."
+		}
+		ctx := context.Background()
+		for _, token := range tokens {
+			if err := s.fcm.SendToToken(ctx, token, title, body,
+				map[string]string{"type": "system", "song_title": songTitle, "status": status},
+			); err != nil {
+				log.Printf("[notification] NotifySongRequestUpdated SendToToken failed for token %s: %v", token, err)
+			}
+		}
+	}()
+}
+
 // NotifyPlaylistUpdate sends a push notification to all devices belonging to
 // the given member user IDs. Used when a playlist is updated or someone joins.
 func (s *NotificationService) NotifyPlaylistUpdate(playlistName string, memberIDs []int) {

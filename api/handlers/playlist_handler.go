@@ -175,6 +175,11 @@ func (h *Handler) ReorderPlaylistSongs(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Fail(c, status, err.Error())
 	}
+	// Notify other members about the reorder
+	if memberIDs, name, e := h.playlists.GetTeamMembersForNotification(id); e == nil {
+		others := filterOutUserID(memberIDs, cl.UserID)
+		h.notifications.NotifyPlaylistUpdate(name, others)
+	}
 	return utils.OK(c, 200, "Playlist songs reordered", fiber.Map{"playlist_id": id})
 }
 
@@ -191,6 +196,11 @@ func (h *Handler) RemoveSongFromPlaylist(c *fiber.Ctx) error {
 	status, err := h.playlists.RemoveSong(id, cl.UserID, songID)
 	if err != nil {
 		return utils.Fail(c, status, err.Error())
+	}
+	// Notify other members about the removal
+	if memberIDs, name, e := h.playlists.GetTeamMembersForNotification(id); e == nil {
+		others := filterOutUserID(memberIDs, cl.UserID)
+		h.notifications.NotifyPlaylistUpdate(name, others)
 	}
 	return utils.OK(c, 200, "Song removed from playlist successfully", fiber.Map{"playlist_id": id, "song_id": songID})
 }

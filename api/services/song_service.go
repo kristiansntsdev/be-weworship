@@ -500,3 +500,8 @@ func (s *SongService) DeleteSongRequest(id, userID int) error {
 	_, err = s.songs.DeleteSongRequest(id, userID)
 	return err
 }
+
+// GetSongRequestByID returns a song request by its ID.
+func (s *SongService) GetSongRequestByID(id int) (*models.SongRequest, bool, error) {
+	return s.songs.GetSongRequestByID(id)
+}

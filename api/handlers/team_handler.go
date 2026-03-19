@@ -50,9 +50,19 @@ func (h *Handler) LeaveTeam(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Fail(c, 400, "Invalid team ID")
 	}
+	// Get owner info before leaving (team still exists at this point)
+	ownerID, playlistName, ownerErr := h.playlists.GetOwnerByTeamID(teamID)
 	status, err := h.teams.Leave(teamID, cl.UserID)
 	if err != nil {
 		return utils.Fail(c, status, err.Error())
+	}
+	// Notify the playlist owner that a member left
+	if ownerErr == nil && ownerID != cl.UserID {
+		memberName := cl.Name
+		if memberName == "" {
+			memberName = cl.Email
+		}
+		h.notifications.NotifyMemberLeft(playlistName, memberName, ownerID)
 	}
 	return utils.OK(c, 200, "Successfully left the team", fiber.Map{"team_id": teamID, "user_id": cl.UserID})
 }

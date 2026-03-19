@@ -396,3 +396,17 @@ func (s *PlaylistService) GetTeamMembersForNotification(playlistID int) ([]int, 
 	return members, pl.PlaylistName, nil
 }
 
+// GetOwnerByTeamID returns the playlist owner user ID and playlist name for a
+// given team ID. Used by LeaveTeam to notify the playlist owner.
+func (s *PlaylistService) GetOwnerByTeamID(teamID int) (ownerID int, playlistName string, err error) {
+	team, err := s.teams.GetByID(teamID)
+	if err != nil || team == nil {
+		return 0, "", fmt.Errorf("team not found")
+	}
+	pl, err := s.playlists.GetByID(team.PlaylistID)
+	if err != nil || pl == nil {
+		return 0, "", fmt.Errorf("playlist not found")
+	}
+	return pl.UserID, pl.PlaylistName, nil
+}
+

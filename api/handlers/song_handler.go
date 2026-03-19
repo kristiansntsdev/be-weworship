@@ -292,11 +292,17 @@ func (h *Handler) UpdateSongRequest(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Fail(c, 400, "Invalid JSON")
 	}
+	// Fetch request before update so we have the title and requester ID
+	songReq, found, _ := h.songs.GetSongRequestByID(id)
 	if err := h.songs.UpdateSongRequestStatus(id, req.Status, req.AdminNotes); err != nil {
 		if err.Error() == "invalid status: must be pending, approved, or rejected" {
 			return utils.Fail(c, 400, err.Error())
 		}
 		return utils.Fail(c, 500, "Failed to update song request")
+	}
+	// Notify the requester when status changes to approved or rejected
+	if found && songReq != nil && (req.Status == "approved" || req.Status == "rejected") {
+		h.notifications.NotifySongRequestUpdated(songReq.SongTitle, req.Status, songReq.UserID)
 	}
 	return utils.OK(c, 200, "Song request updated successfully", nil)
 }
