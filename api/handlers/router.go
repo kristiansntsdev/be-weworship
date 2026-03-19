@@ -111,8 +111,9 @@ admin.Get("/analytics/sessions", h.GetAnalyticsSessions)
 admin.Get("/analytics/performance", h.GetAnalyticsPerformance)
 
 // Song requests (admin)
-admin.Get("/song-requests", h.GetSongRequests)
-admin.Put("/song-requests/:id", h.UpdateSongRequest)
+// Song requests: accessible by admin and maintainer
+api.Get("/admin/song-requests", ra, rm, h.GetSongRequests)
+api.Put("/admin/song-requests/:id", ra, rm, h.UpdateSongRequest)
 
 // Audit log
 admin.Get("/audit-logs", h.GetAuditLogs)
