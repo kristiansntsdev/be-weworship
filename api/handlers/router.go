@@ -118,6 +118,7 @@ admin.Get("/analytics/performance", h.GetAnalyticsPerformance)
 // Song requests: accessible by admin and maintainer
 api.Get("/admin/song-requests", ra, rm, h.GetSongRequests)
 api.Put("/admin/song-requests/:id", ra, rm, h.UpdateSongRequest)
+api.Get("/admin/fcm-status", ra, rm, h.GetFCMStatus)
 
 // Audit log
 admin.Get("/audit-logs", h.GetAuditLogs)

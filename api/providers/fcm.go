@@ -74,6 +74,11 @@ func (p *FCMProvider) Close() {
 	}
 }
 
+// ProjectID returns the Firebase project ID this provider is configured for.
+func (p *FCMProvider) ProjectID() string {
+	return p.projectID
+}
+
 // defaultApnsPayload returns the APNS payload map required by ApnsConfig.Payload.
 // ApnsConfig.Payload is map[string]interface{}, so we use ApnsPayload.MustToMap()
 // to convert the typed struct.

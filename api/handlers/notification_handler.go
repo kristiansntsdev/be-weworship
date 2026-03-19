@@ -108,3 +108,13 @@ func (h *Handler) MarkNotificationRead(c *fiber.Ctx) error {
 	}
 	return utils.OK(c, 200, "Notification marked as read", nil)
 }
+
+// GetFCMStatus returns whether the FCM provider is active (admin-only debug endpoint).
+// GET /api/admin/fcm-status
+func (h *Handler) GetFCMStatus(c *fiber.Ctx) error {
+	enabled, projectID := h.notifications.FCMStatus()
+	return utils.OK(c, 200, "OK", fiber.Map{
+		"fcm_enabled": enabled,
+		"project_id":  projectID,
+	})
+}

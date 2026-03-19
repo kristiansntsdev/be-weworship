@@ -4,6 +4,8 @@ import (
 	"be-songbanks-v1/api/middleware"
 	"be-songbanks-v1/api/utils"
 	"bytes"
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 	"strings"
 )
@@ -196,7 +198,10 @@ func (h *Handler) UpdateSong(c *fiber.Ctx) error {
 	}
 	// Fire notification when lyrics_and_chords is being added for the first time
 	// (song transitions to ChordPro-ready status).
-	if req.LyricsAndChord != nil && *req.LyricsAndChord != "" && strVal(beforeMap, "lyrics_and_chords") == "" {
+	hasNewChords := req.LyricsAndChord != nil && *req.LyricsAndChord != ""
+	hadChords := strVal(beforeMap, "lyrics_and_chords") != ""
+	log.Printf("[song] UpdateSong id=%d: hasNewChords=%v hadChords=%v → notify=%v", id, hasNewChords, hadChords, hasNewChords && !hadChords)
+	if hasNewChords && !hadChords {
 		title := strVal(beforeMap, "title")
 		if req.Title != nil && *req.Title != "" {
 			title = *req.Title

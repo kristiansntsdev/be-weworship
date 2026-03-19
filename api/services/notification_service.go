@@ -183,3 +183,11 @@ func (s *NotificationService) MarkAsRead(id, userID int) error {
 func (s *NotificationService) GetUnreadCount(userID int) (int, error) {
 	return s.repo.CountUnread(userID)
 }
+
+// FCMStatus returns whether FCM is enabled and the project ID for debugging.
+func (s *NotificationService) FCMStatus() (enabled bool, projectID string) {
+	if s.fcm == nil {
+		return false, ""
+	}
+	return true, s.fcm.ProjectID()
+}
