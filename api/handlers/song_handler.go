@@ -132,6 +132,12 @@ func (h *Handler) CreateSong(c *fiber.Ctx) error {
 		uid := cl.UserID
 		h.audit.Log(&uid, cl.Name, cl.Email, "create", "song", nil, req.Title, map[string]any{"title": req.Title, "artist": req.Artist, "base_chord": req.BaseChord})
 	}
+	// Notify all subscribers that a new song is available.
+	// If LyricsAndChord is set the song is already ChordPro-ready; notify immediately.
+	// Songs without lyrics will trigger a notification when lyrics are added via UpdateSong.
+	if req.LyricsAndChord != nil && *req.LyricsAndChord != "" {
+		h.notifications.NotifyNewSong(req.Title)
+	}
 	return utils.OK(c, 201, "Song created successfully", out)
 }
 
@@ -187,6 +193,15 @@ func (h *Handler) UpdateSong(c *fiber.Ctx) error {
 		}
 		entityName := strVal(beforeMap, "title")
 		h.audit.Log(&uid, cl.Name, cl.Email, "update", "song", &id, entityName, changes)
+	}
+	// Fire notification when lyrics_and_chords is being added for the first time
+	// (song transitions to ChordPro-ready status).
+	if req.LyricsAndChord != nil && *req.LyricsAndChord != "" && strVal(beforeMap, "lyrics_and_chords") == "" {
+		title := strVal(beforeMap, "title")
+		if req.Title != nil && *req.Title != "" {
+			title = *req.Title
+		}
+		h.notifications.NotifyNewSong(title)
 	}
 	return utils.OK(c, 200, "Song updated successfully", fiber.Map{"id": id})
 }

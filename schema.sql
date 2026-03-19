@@ -173,3 +173,17 @@ CREATE TABLE IF NOT EXISTS playlist_share_events (
 );
 CREATE INDEX IF NOT EXISTS idx_pse_created  ON playlist_share_events ("createdAt");
 CREATE INDEX IF NOT EXISTS idx_pse_playlist ON playlist_share_events (playlist_id);
+
+-- ── Device Tokens (FCM Push Notifications) ─────────────────────────────────────
+-- Tokens expire after 1 week (enforced by the backend on upsert).
+CREATE TABLE IF NOT EXISTS device_tokens (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token       TEXT        NOT NULL,
+    platform    VARCHAR(10) NOT NULL DEFAULT 'android',   -- 'android' | 'ios'
+    "createdAt" TIMESTAMP   NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMP   NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, token)
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user_id  ON device_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_updated  ON device_tokens ("updatedAt");

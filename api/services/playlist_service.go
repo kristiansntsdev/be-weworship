@@ -375,3 +375,24 @@ func (s *PlaylistService) GetPreview(shareToken string) (map[string]any, int, er
 		"song_count":    songCount,
 	}, 200, nil
 }
+
+// GetTeamMembersForNotification returns the playlist name and all team member
+// user IDs for a given playlist. Used by handlers to target push notifications.
+func (s *PlaylistService) GetTeamMembersForNotification(playlistID int) ([]int, string, error) {
+	pl, err := s.playlists.GetByID(playlistID)
+	if err != nil || pl == nil {
+		return nil, "", fmt.Errorf("playlist not found")
+	}
+	team, err := s.teams.FindByPlaylistID(playlistID)
+	if err != nil || team == nil {
+		// No team yet – just return the owner
+		return []int{pl.UserID}, pl.PlaylistName, nil
+	}
+	members := utils.ParseIntSlice(team.MembersRaw.String)
+	// Include the lead if not already in members
+	if !utils.ContainsInt(members, team.LeadID) {
+		members = append(members, team.LeadID)
+	}
+	return members, pl.PlaylistName, nil
+}
+

@@ -103,6 +103,12 @@ func (h *Handler) JoinPlaylist(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Fail(c, status, err.Error())
 	}
+	// Notify all team members that someone joined.
+	if playlistID, ok := data["playlist_id"].(int); ok {
+		if memberIDs, name, e := h.playlists.GetTeamMembersForNotification(playlistID); e == nil {
+			h.notifications.NotifyPlaylistUpdate(name, memberIDs)
+		}
+	}
 	return utils.OK(c, 201, "Successfully joined playlist team", data)
 }
 
@@ -121,6 +127,10 @@ func (h *Handler) AddSongsToPlaylist(c *fiber.Ctx) error {
 	status, err := h.playlists.AddSongs(id, cl.UserID, req.SongIDs)
 	if err != nil {
 		return utils.Fail(c, status, err.Error())
+	}
+	// Notify all team members that songs were added to the playlist.
+	if memberIDs, name, e := h.playlists.GetTeamMembersForNotification(id); e == nil {
+		h.notifications.NotifyPlaylistUpdate(name, memberIDs)
 	}
 	return utils.OK(c, 200, "Song(s) added to playlist successfully", fiber.Map{"playlist_id": id, "songIds": req.SongIDs})
 }

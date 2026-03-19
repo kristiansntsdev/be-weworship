@@ -79,8 +79,11 @@ func buildApp() (*fiber.App, error) {
 	auditRepo := repositories.NewAuditRepository(ctx.DB)
 	auditSvc := services.NewAuditService(auditRepo)
 
+	notifRepo := repositories.NewNotificationRepository(ctx.DB)
+	notifSvc := services.NewNotificationService(ctx.FCM, notifRepo)
+
 	authMW := middleware.NewAuthMiddleware(authSvc)
-	h := handlers.NewHandler(authMW, authSvc, songSvc, tagSvc, playlistSvc, teamSvc, userSvc, analyticsSvc, auditSvc)
+	h := handlers.NewHandler(authMW, authSvc, songSvc, tagSvc, playlistSvc, teamSvc, userSvc, analyticsSvc, auditSvc, notifSvc)
 
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	app.Use(cors.New(cors.Config{

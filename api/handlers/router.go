@@ -11,19 +11,20 @@ import (
 )
 
 type Handler struct {
-authMW    *middleware.AuthMiddleware
-auth      *services.AuthService
-songs     *services.SongService
-tags      *services.TagService
-playlists *services.PlaylistService
-teams     *services.TeamService
-users     *services.UserService
-analytics *services.AnalyticsService
-audit     *services.AuditService
+authMW        *middleware.AuthMiddleware
+auth          *services.AuthService
+songs         *services.SongService
+tags          *services.TagService
+playlists     *services.PlaylistService
+teams         *services.TeamService
+users         *services.UserService
+analytics     *services.AnalyticsService
+audit         *services.AuditService
+notifications *services.NotificationService
 }
 
-func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService) *Handler {
-return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit}
+func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService, notifications *services.NotificationService) *Handler {
+return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit, notifications: notifications}
 }
 
 func (h *Handler) Register(app *fiber.App) {
@@ -61,6 +62,10 @@ api.Get("/auth/me", ra, h.GetMe)
 api.Get("/auth/check-permission", ra, h.CheckPermission)
 api.Put("/profile", ra, h.UpdateProfile)
 	api.Put("/profile/avatar", ra, h.UpdateAvatar)
+
+	// ── Push notifications ─────────────────────────────────────────────────────
+	api.Post("/notifications/device-token", ra, h.RegisterDeviceToken)
+	api.Delete("/notifications/device-token", ra, h.UnregisterDeviceToken)
 
 api.Post("/playlists", ra, h.CreatePlaylist)
 api.Get("/playlists", ra, h.GetPlaylists)
