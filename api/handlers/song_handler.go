@@ -5,10 +5,14 @@ import (
 	"be-songbanks-v1/api/utils"
 	"bytes"
 	"log"
+	"regexp"
 
 	"github.com/gofiber/fiber/v2"
 	"strings"
 )
+
+// chordProPattern matches an inline ChordPro chord marker like [C], [Am], [G/B], [C#m7].
+var chordProPattern = regexp.MustCompile(`\[[A-G][^\]\n]{0,6}\]`)
 
 func (h *Handler) GetHome(c *fiber.Ctx) error {
 	stats, err := h.songs.HomeStats()
@@ -134,10 +138,9 @@ func (h *Handler) CreateSong(c *fiber.Ctx) error {
 		uid := cl.UserID
 		h.audit.Log(&uid, cl.Name, cl.Email, "create", "song", nil, req.Title, map[string]any{"title": req.Title, "artist": req.Artist, "base_chord": req.BaseChord})
 	}
-	// Notify all subscribers that a new song is available.
-	// If LyricsAndChord is set the song is already ChordPro-ready; notify immediately.
-	// Songs without lyrics will trigger a notification when lyrics are added via UpdateSong.
-	if req.LyricsAndChord != nil && *req.LyricsAndChord != "" {
+	// Notify when a new song is created with ChordPro content.
+	if req.LyricsAndChord != nil && isChordProContent(*req.LyricsAndChord) {
+		log.Printf("[song] CreateSong: ChordPro content detected, notifying for %q", req.Title)
 		h.notifications.NotifyNewSong(req.Title)
 	}
 	return utils.OK(c, 201, "Song created successfully", out)
@@ -196,12 +199,17 @@ func (h *Handler) UpdateSong(c *fiber.Ctx) error {
 		entityName := strVal(beforeMap, "title")
 		h.audit.Log(&uid, cl.Name, cl.Email, "update", "song", &id, entityName, changes)
 	}
-	// Fire notification when lyrics_and_chords is being added for the first time
-	// (song transitions to ChordPro-ready status).
-	hasNewChords := req.LyricsAndChord != nil && *req.LyricsAndChord != ""
-	hadChords := strVal(beforeMap, "lyrics_and_chords") != ""
-	log.Printf("[song] UpdateSong id=%d: hasNewChords=%v hadChords=%v → notify=%v", id, hasNewChords, hadChords, hasNewChords && !hadChords)
-	if hasNewChords && !hadChords {
+	// Fire notification when song transitions to ChordPro format.
+	// Triggers when: new content IS ChordPro AND old content was NOT ChordPro.
+	newContent := ""
+	if req.LyricsAndChord != nil {
+		newContent = *req.LyricsAndChord
+	}
+	oldContent := strVal(beforeMap, "lyrics_and_chords")
+	nowChordPro := isChordProContent(newContent)
+	wasChordPro := isChordProContent(oldContent)
+	log.Printf("[song] UpdateSong id=%d: nowChordPro=%v wasChordPro=%v → notify=%v", id, nowChordPro, wasChordPro, nowChordPro && !wasChordPro)
+	if nowChordPro && !wasChordPro {
 		title := strVal(beforeMap, "title")
 		if req.Title != nil && *req.Title != "" {
 			title = *req.Title
@@ -243,6 +251,11 @@ func strVal(m map[string]any, key string) string {
 		}
 	}
 	return ""
+}
+
+// isChordProContent returns true if the text contains at least one inline ChordPro chord marker.
+func isChordProContent(text string) bool {
+	return chordProPattern.MatchString(text)
 }
 
 // ── Song Requests ─────────────────────────────────────────────────────────────
