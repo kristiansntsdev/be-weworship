@@ -120,7 +120,7 @@ func (p *FCMProvider) SendToToken(ctx context.Context, token, title, body string
 		return fmt.Errorf("fcm: send to token failed: %w", err)
 	}
 
-	log.Printf("[fcm] sent to token %s: %+v", token, resp)
+	log.Printf("[fcm] SendToToken OK token=%.20s... name=%s", token, resp.Name)
 	return nil
 }
 
@@ -158,7 +158,7 @@ func (p *FCMProvider) SendToTopic(ctx context.Context, topic, title, body string
 		return fmt.Errorf("fcm: send to topic failed: %w", err)
 	}
 
-	log.Printf("[fcm] sent to topic %s: %+v", topic, resp)
+	log.Printf("[fcm] SendToTopic OK topic=%s name=%s", topic, resp.Name)
 	return nil
 }
 
