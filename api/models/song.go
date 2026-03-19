@@ -25,12 +25,12 @@ type Tag struct {
 }
 
 type SongRequest struct {
-	ID            int            `db:"id"`
-	UserID        int            `db:"user_id"`
-	SongTitle     string         `db:"song_title"`
-	ReferenceLink string         `db:"reference_link"`
-	Status        string         `db:"status"`
-	AdminNotes    sql.NullString `db:"admin_notes"`
-	CreatedAt     sql.NullTime   `db:"createdAt"`
-	UpdatedAt     sql.NullTime   `db:"updatedAt"`
+	ID            int            `db:"id"            json:"id"`
+	UserID        int            `db:"user_id"       json:"user_id"`
+	SongTitle     string         `db:"song_title"    json:"song_title"`
+	ReferenceLink string         `db:"reference_link" json:"reference_link"`
+	Status        string         `db:"status"        json:"status"`
+	AdminNotes    sql.NullString `db:"admin_notes"   json:"admin_notes,omitempty"`
+	CreatedAt     sql.NullTime   `db:"createdAt"     json:"createdAt"`
+	UpdatedAt     sql.NullTime   `db:"updatedAt"     json:"updatedAt"`
 }
