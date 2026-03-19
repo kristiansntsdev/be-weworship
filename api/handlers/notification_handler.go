@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strconv"
+
 	"be-songbanks-v1/api/middleware"
 	"be-songbanks-v1/api/utils"
 
@@ -53,4 +55,56 @@ func (h *Handler) UnregisterDeviceToken(c *fiber.Ctx) error {
 		return utils.Fail(c, 500, "Failed to remove device token")
 	}
 	return utils.OK(c, 200, "Device token removed", nil)
+}
+
+// GetNotifications returns the notification inbox for the authenticated user.
+// Includes both targeted notifications and broadcast rows (new song, etc.).
+// GET /api/notifications?page=1&limit=20
+func (h *Handler) GetNotifications(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Unauthorized")
+	}
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	if limit > 50 {
+		limit = 50
+	}
+	rows, err := h.notifications.GetNotifications(cl.UserID, page, limit)
+	if err != nil {
+		return utils.Fail(c, 500, "Failed to fetch notifications")
+	}
+	return utils.OK(c, 200, "OK", rows)
+}
+
+// GetUnreadCount returns the number of unread targeted notifications.
+// Broadcast rows (new song) are excluded from this count.
+// GET /api/notifications/unread-count
+func (h *Handler) GetUnreadCount(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Unauthorized")
+	}
+	count, err := h.notifications.GetUnreadCount(cl.UserID)
+	if err != nil {
+		return utils.Fail(c, 500, "Failed to fetch unread count")
+	}
+	return utils.OK(c, 200, "OK", fiber.Map{"count": count})
+}
+
+// MarkNotificationRead marks a single targeted notification as read.
+// POST /api/notifications/:id/read
+func (h *Handler) MarkNotificationRead(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Unauthorized")
+	}
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil || id <= 0 {
+		return utils.Fail(c, 400, "invalid notification id")
+	}
+	if err := h.notifications.MarkAsRead(id, cl.UserID); err != nil {
+		return utils.Fail(c, 500, "Failed to mark notification as read")
+	}
+	return utils.OK(c, 200, "Notification marked as read", nil)
 }

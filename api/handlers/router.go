@@ -69,6 +69,10 @@ api.Put("/profile", ra, h.UpdateProfile)
 	// ── Push notifications ─────────────────────────────────────────────────────
 	api.Post("/notifications/device-token", ra, h.RegisterDeviceToken)
 	api.Delete("/notifications/device-token", ra, h.UnregisterDeviceToken)
+	// ── Notification inbox ─────────────────────────────────────────────────────
+	api.Get("/notifications", ra, h.GetNotifications)
+	api.Get("/notifications/unread-count", ra, h.GetUnreadCount)
+	api.Post("/notifications/:id/read", ra, h.MarkNotificationRead)
 
 api.Post("/playlists", ra, h.CreatePlaylist)
 api.Get("/playlists", ra, h.GetPlaylists)

@@ -201,3 +201,18 @@ CREATE TABLE IF NOT EXISTS song_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_song_requests_user_id ON song_requests (user_id);
 CREATE INDEX IF NOT EXISTS idx_song_requests_status  ON song_requests (status);
+
+-- ── Notification inbox ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+    id          SERIAL      PRIMARY KEY,
+    user_id     INTEGER     REFERENCES users(id) ON DELETE CASCADE,  -- NULL = broadcast (visible to all)
+    title       TEXT        NOT NULL,
+    message     TEXT        NOT NULL,
+    group_type  TEXT        NOT NULL DEFAULT 'system',
+    is_read     BOOLEAN     NOT NULL DEFAULT FALSE,
+    data        TEXT,
+    "createdAt" TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id      ON notifications (user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read      ON notifications (user_id, is_read) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_broadcast    ON notifications ("createdAt") WHERE user_id IS NULL;

@@ -64,3 +64,67 @@ func (r *NotificationRepository) GetTokensByUserIDs(userIDs []int) ([]string, er
 	}
 	return tokens, nil
 }
+
+// NotificationRow is a single notification inbox entry.
+// UserID is nil for broadcast notifications (visible to all users).
+type NotificationRow struct {
+	ID        int     `db:"id"`
+	UserID    *int    `db:"user_id"`
+	Title     string  `db:"title"`
+	Message   string  `db:"message"`
+	GroupType string  `db:"group_type"`
+	IsRead    bool    `db:"is_read"`
+	Data      string  `db:"data"`
+	CreatedAt string  `db:"createdAt"`
+}
+
+// SaveNotification persists a targeted notification to the inbox for a specific user.
+func (r *NotificationRepository) SaveNotification(userID int, title, message, groupType, data string) error {
+	_, err := r.db.Exec(`
+		INSERT INTO notifications (user_id, title, message, group_type, is_read, data, "createdAt")
+		VALUES ($1, $2, $3, $4, FALSE, $5, NOW())
+	`, userID, title, message, groupType, data)
+	return err
+}
+
+// SaveBroadcastNotification persists a broadcast notification (user_id = NULL) visible to all users.
+func (r *NotificationRepository) SaveBroadcastNotification(title, message, groupType, data string) error {
+	_, err := r.db.Exec(`
+		INSERT INTO notifications (user_id, title, message, group_type, is_read, data, "createdAt")
+		VALUES (NULL, $1, $2, $3, FALSE, $4, NOW())
+	`, title, message, groupType, data)
+	return err
+}
+
+// ListByUserID returns paginated notifications for a user (targeted + broadcasts), newest first.
+func (r *NotificationRepository) ListByUserID(userID, page, limit int) ([]NotificationRow, error) {
+	if page < 1 {
+		page = 1
+	}
+	offset := (page - 1) * limit
+	var rows []NotificationRow
+	err := r.db.Select(&rows, `
+		SELECT id, user_id, title, message, group_type,
+		       CASE WHEN user_id IS NULL THEN TRUE ELSE is_read END AS is_read,
+		       COALESCE(data,'') AS data, "createdAt"
+		FROM notifications
+		WHERE user_id = $1 OR user_id IS NULL
+		ORDER BY "createdAt" DESC
+		LIMIT $2 OFFSET $3
+	`, userID, limit, offset)
+	return rows, err
+}
+
+// MarkRead marks a single targeted notification as read (broadcast rows are unaffected).
+func (r *NotificationRepository) MarkRead(id, userID int) error {
+	_, err := r.db.Exec(`UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2`, id, userID)
+	return err
+}
+
+// CountUnread returns the number of unread targeted notifications for a user.
+// Broadcast rows are excluded — they never count toward the unread badge.
+func (r *NotificationRepository) CountUnread(userID int) (int, error) {
+	var count int
+	err := r.db.Get(&count, `SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE`, userID)
+	return count, err
+}

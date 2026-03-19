@@ -31,17 +31,21 @@ func (s *NotificationService) RemoveDeviceToken(userID int, token string) error 
 }
 
 // NotifyNewSong sends a push notification to all devices subscribed to the
-// "new-songs" FCM topic. Triggered when a song is created OR its
-// lyrics_and_chords are first set (ChordPro-ready).
+// "new-songs" FCM topic AND saves a broadcast inbox row (user_id = NULL).
 func (s *NotificationService) NotifyNewSong(title string) {
 	if s.fcm == nil {
 		return
+	}
+	msg := title + " is now available on WeWorship!"
+	// Persist broadcast inbox row (visible to all users).
+	if err := s.repo.SaveBroadcastNotification("🎵 New Song Available", msg, "new_song", `{"type":"new_song"}`); err != nil {
+		log.Printf("[notification] SaveBroadcastNotification failed: %v", err)
 	}
 	go func() {
 		ctx := context.Background()
 		err := s.fcm.SendToTopic(ctx, "new-songs",
 			"🎵 New Song Available",
-			title+" is now available on WeWorship!",
+			msg,
 			map[string]string{"type": "new_song", "title": title},
 		)
 		if err != nil {
@@ -51,9 +55,17 @@ func (s *NotificationService) NotifyNewSong(title string) {
 }
 
 // NotifyMemberLeft sends a push notification to the playlist owner when a
-// member leaves their team.
+// member leaves their team, and saves a targeted inbox row for the owner.
 func (s *NotificationService) NotifyMemberLeft(playlistName, memberName string, ownerID int) {
-	if s.fcm == nil || ownerID == 0 {
+	if ownerID == 0 {
+		return
+	}
+	notifTitle := "👋 Member Left"
+	notifBody := memberName + " left your \"" + playlistName + "\" playlist."
+	if err := s.repo.SaveNotification(ownerID, notifTitle, notifBody, "playlist_update", `{"type":"playlist_update"}`); err != nil {
+		log.Printf("[notification] SaveNotification(member_left) failed: %v", err)
+	}
+	if s.fcm == nil {
 		return
 	}
 	go func() {
@@ -64,9 +76,7 @@ func (s *NotificationService) NotifyMemberLeft(playlistName, memberName string, 
 		}
 		ctx := context.Background()
 		for _, token := range tokens {
-			if err := s.fcm.SendToToken(ctx, token,
-				"👋 Member Left",
-				memberName+" left your \""+playlistName+"\" playlist.",
+			if err := s.fcm.SendToToken(ctx, token, notifTitle, notifBody,
 				map[string]string{"type": "playlist_update", "playlist": playlistName},
 			); err != nil {
 				log.Printf("[notification] NotifyMemberLeft SendToToken failed for token %s: %v", token, err)
@@ -76,9 +86,23 @@ func (s *NotificationService) NotifyMemberLeft(playlistName, memberName string, 
 }
 
 // NotifySongRequestUpdated sends a push notification to the requester when
-// their song request status changes to approved or rejected.
+// their song request status changes to approved or rejected, and saves to inbox.
 func (s *NotificationService) NotifySongRequestUpdated(songTitle, status string, requesterID int) {
-	if s.fcm == nil || requesterID == 0 {
+	if requesterID == 0 {
+		return
+	}
+	var notifTitle, notifBody string
+	if status == "approved" {
+		notifTitle = "✅ Song Request Approved"
+		notifBody = "Your request for \"" + songTitle + "\" has been approved!"
+	} else {
+		notifTitle = "❌ Song Request Rejected"
+		notifBody = "Your request for \"" + songTitle + "\" was not approved."
+	}
+	if err := s.repo.SaveNotification(requesterID, notifTitle, notifBody, "system", `{"type":"system"}`); err != nil {
+		log.Printf("[notification] SaveNotification(song_request) failed: %v", err)
+	}
+	if s.fcm == nil {
 		return
 	}
 	go func() {
@@ -87,17 +111,9 @@ func (s *NotificationService) NotifySongRequestUpdated(songTitle, status string,
 			log.Printf("[notification] NotifySongRequestUpdated GetTokens failed: %v", err)
 			return
 		}
-		var title, body string
-		if status == "approved" {
-			title = "✅ Song Request Approved"
-			body = "Your request for \"" + songTitle + "\" has been approved!"
-		} else {
-			title = "❌ Song Request Rejected"
-			body = "Your request for \"" + songTitle + "\" was not approved."
-		}
 		ctx := context.Background()
 		for _, token := range tokens {
-			if err := s.fcm.SendToToken(ctx, token, title, body,
+			if err := s.fcm.SendToToken(ctx, token, notifTitle, notifBody,
 				map[string]string{"type": "system", "song_title": songTitle, "status": status},
 			); err != nil {
 				log.Printf("[notification] NotifySongRequestUpdated SendToToken failed for token %s: %v", token, err)
@@ -107,9 +123,19 @@ func (s *NotificationService) NotifySongRequestUpdated(songTitle, status string,
 }
 
 // NotifyPlaylistUpdate sends a push notification to all devices belonging to
-// the given member user IDs. Used when a playlist is updated or someone joins.
+// the given member user IDs and saves a targeted inbox row for each member.
 func (s *NotificationService) NotifyPlaylistUpdate(playlistName string, memberIDs []int) {
-	if s.fcm == nil || len(memberIDs) == 0 {
+	if len(memberIDs) == 0 {
+		return
+	}
+	notifTitle := "📋 Playlist Updated"
+	notifBody := playlistName + " has been updated."
+	for _, uid := range memberIDs {
+		if err := s.repo.SaveNotification(uid, notifTitle, notifBody, "playlist_update", `{"type":"playlist_update"}`); err != nil {
+			log.Printf("[notification] SaveNotification(playlist_update) uid=%d failed: %v", uid, err)
+		}
+	}
+	if s.fcm == nil {
 		return
 	}
 	go func() {
@@ -120,13 +146,28 @@ func (s *NotificationService) NotifyPlaylistUpdate(playlistName string, memberID
 		}
 		ctx := context.Background()
 		for _, token := range tokens {
-			if err := s.fcm.SendToToken(ctx, token,
-				"📋 Playlist Updated",
-				playlistName+" has been updated.",
+			if err := s.fcm.SendToToken(ctx, token, notifTitle, notifBody,
 				map[string]string{"type": "playlist_update", "playlist": playlistName},
 			); err != nil {
 				log.Printf("[notification] SendToToken failed for token %s: %v", token, err)
 			}
 		}
 	}()
+}
+
+// ── Inbox query methods ───────────────────────────────────────────────────────
+
+// GetNotifications returns paginated inbox items for a user (targeted + broadcasts).
+func (s *NotificationService) GetNotifications(userID, page, limit int) ([]repositories.NotificationRow, error) {
+	return s.repo.ListByUserID(userID, page, limit)
+}
+
+// MarkAsRead marks a targeted notification as read for the given user.
+func (s *NotificationService) MarkAsRead(id, userID int) error {
+	return s.repo.MarkRead(id, userID)
+}
+
+// GetUnreadCount returns the count of unread targeted notifications (broadcasts excluded).
+func (s *NotificationService) GetUnreadCount(userID int) (int, error) {
+	return s.repo.CountUnread(userID)
 }
