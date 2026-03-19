@@ -23,3 +23,14 @@ type Tag struct {
 	Name        string         `db:"name"`
 	Description sql.NullString `db:"description"`
 }
+
+type SongRequest struct {
+	ID            int            `db:"id"`
+	UserID        int            `db:"user_id"`
+	SongTitle     string         `db:"song_title"`
+	ReferenceLink string         `db:"reference_link"`
+	Status        string         `db:"status"`
+	AdminNotes    sql.NullString `db:"admin_notes"`
+	CreatedAt     sql.NullTime   `db:"createdAt"`
+	UpdatedAt     sql.NullTime   `db:"updatedAt"`
+}

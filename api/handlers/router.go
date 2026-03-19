@@ -45,6 +45,7 @@ api.Get("/artists", h.GetArtists)
 api.Get("/songs", h.GetSongs)
 api.Get("/songs/export", ra, h.GetSongsExport)
 api.Get("/songs/:id", h.GetSongByID)
+api.Post("/songs/request", ra, h.RequestSong)
 api.Get("/tags", h.GetTags)
 api.Post("/tags/get-or-create", h.GetOrCreateTag)
 
@@ -106,6 +107,10 @@ admin.Get("/analytics/users", h.GetAnalyticsUsers)
 admin.Get("/analytics/searches", h.GetAnalyticsSearches)
 admin.Get("/analytics/sessions", h.GetAnalyticsSessions)
 admin.Get("/analytics/performance", h.GetAnalyticsPerformance)
+
+// Song requests (admin)
+admin.Get("/song-requests", h.GetSongRequests)
+admin.Put("/song-requests/:id", h.UpdateSongRequest)
 
 // Audit log
 admin.Get("/audit-logs", h.GetAuditLogs)

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"be-songbanks-v1/api/models"
 	"be-songbanks-v1/api/platform"
 	"be-songbanks-v1/api/repositories"
 	"be-songbanks-v1/api/utils"
@@ -443,4 +444,34 @@ func buildSongsCacheKey(page, limit int, search, baseChord, sortBy, sortOrder st
 	}
 	return fmt.Sprintf("songs:list:page=%d:limit=%d:search=%s:base=%s:sortBy=%s:sortOrder=%s:tags=%s:hasLink=%s:chordPro=%s",
 		page, limit, strings.TrimSpace(search), strings.TrimSpace(baseChord), sortBy, strings.ToUpper(sortOrder), tagPart, boolPart(hasLink), boolPart(chordPro))
+}
+
+// ── Song Requests ─────────────────────────────────────────────────────────────
+
+func (s *SongService) RequestSong(userID int, songTitle, referenceLink string) (*models.SongRequest, error) {
+	if strings.TrimSpace(songTitle) == "" {
+		return nil, fmt.Errorf("song_title is required")
+	}
+	if strings.TrimSpace(referenceLink) == "" {
+		return nil, fmt.Errorf("reference_link is required")
+	}
+	return s.songs.CreateSongRequest(userID, strings.TrimSpace(songTitle), strings.TrimSpace(referenceLink))
+}
+
+func (s *SongService) ListSongRequests(status string, page, limit int) ([]models.SongRequest, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	return s.songs.ListSongRequests(status, page, limit)
+}
+
+func (s *SongService) UpdateSongRequestStatus(id int, status, adminNotes string) error {
+	validStatuses := map[string]bool{"pending": true, "approved": true, "rejected": true}
+	if !validStatuses[status] {
+		return fmt.Errorf("invalid status: must be pending, approved, or rejected")
+	}
+	return s.songs.UpdateSongRequestStatus(id, status, adminNotes)
 }

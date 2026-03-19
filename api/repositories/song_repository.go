@@ -160,3 +160,49 @@ func (r *SongRepository) ListAllChordPro() ([]models.Song, error) {
 	err := r.db.Select(&rows, `SELECT id,slug,title,artist,base_chord,bpm,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt" FROM songs WHERE (lyrics_and_chords LIKE '%[%' AND lyrics_and_chords NOT LIKE '%<span%') AND dmca_takedown = false ORDER BY title ASC`)
 	return rows, err
 }
+
+// ── Song Requests ─────────────────────────────────────────────────────────────
+
+func (r *SongRepository) CreateSongRequest(userID int, songTitle, referenceLink string) (*models.SongRequest, error) {
+	req := &models.SongRequest{}
+	err := r.db.QueryRowx(
+		`INSERT INTO song_requests (user_id, song_title, reference_link) VALUES ($1, $2, $3)
+		 RETURNING id, user_id, song_title, reference_link, status, admin_notes, "createdAt", "updatedAt"`,
+		userID, songTitle, referenceLink,
+	).StructScan(req)
+	return req, err
+}
+
+func (r *SongRepository) ListSongRequests(status string, page, limit int) ([]models.SongRequest, int, error) {
+	offset := (page - 1) * limit
+	where := "1=1"
+	args := []any{}
+
+	if status != "" {
+		where = "status = $1"
+		args = append(args, status)
+	}
+
+	var total int
+	countQ := `SELECT COUNT(*) FROM song_requests WHERE ` + where
+	if err := r.db.QueryRowx(r.db.Rebind(countQ), args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows := []models.SongRequest{}
+	args = append(args, limit, offset)
+	q := r.db.Rebind(`SELECT id, user_id, song_title, reference_link, status, admin_notes, "createdAt", "updatedAt"
+		FROM song_requests WHERE ` + where + ` ORDER BY "createdAt" DESC LIMIT ? OFFSET ?`)
+	if err := r.db.Select(&rows, q, args...); err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
+}
+
+func (r *SongRepository) UpdateSongRequestStatus(id int, status, adminNotes string) error {
+	_, err := r.db.Exec(
+		`UPDATE song_requests SET status = $1, admin_notes = $2, "updatedAt" = NOW() WHERE id = $3`,
+		status, adminNotes, id,
+	)
+	return err
+}

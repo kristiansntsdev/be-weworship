@@ -187,3 +187,17 @@ CREATE TABLE IF NOT EXISTS device_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_device_tokens_user_id  ON device_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_device_tokens_updated  ON device_tokens ("updatedAt");
+
+-- ── Song Requests ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS song_requests (
+    id              SERIAL PRIMARY KEY,
+    user_id         INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    song_title      VARCHAR(255) NOT NULL,
+    reference_link  TEXT        NOT NULL,
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected'
+    admin_notes     TEXT,
+    "createdAt"     TIMESTAMP   NOT NULL DEFAULT NOW(),
+    "updatedAt"     TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_song_requests_user_id ON song_requests (user_id);
+CREATE INDEX IF NOT EXISTS idx_song_requests_status  ON song_requests (status);

@@ -239,3 +239,64 @@ func strVal(m map[string]any, key string) string {
 	}
 	return ""
 }
+
+// ── Song Requests ─────────────────────────────────────────────────────────────
+
+func (h *Handler) RequestSong(c *fiber.Ctx) error {
+	var req struct {
+		SongTitle     string `json:"song_title"`
+		ReferenceLink string `json:"reference_link"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Unauthorized")
+	}
+	result, err := h.songs.RequestSong(cl.UserID, req.SongTitle, req.ReferenceLink)
+	if err != nil {
+		if err.Error() == "song_title is required" || err.Error() == "reference_link is required" {
+			return utils.Fail(c, 400, err.Error())
+		}
+		return utils.Fail(c, 500, "Failed to submit song request")
+	}
+	return utils.OK(c, 201, "Song request submitted successfully", result)
+}
+
+func (h *Handler) GetSongRequests(c *fiber.Ctx) error {
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 20)
+	status := c.Query("status")
+	data, total, err := h.songs.ListSongRequests(status, page, limit)
+	if err != nil {
+		return utils.Fail(c, 500, "Failed to retrieve song requests")
+	}
+	return utils.OK(c, 200, "Song requests retrieved successfully", fiber.Map{
+		"data":  data,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+func (h *Handler) UpdateSongRequest(c *fiber.Ctx) error {
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid request ID")
+	}
+	var req struct {
+		Status     string `json:"status"`
+		AdminNotes string `json:"admin_notes"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	if err := h.songs.UpdateSongRequestStatus(id, req.Status, req.AdminNotes); err != nil {
+		if err.Error() == "invalid status: must be pending, approved, or rejected" {
+			return utils.Fail(c, 400, err.Error())
+		}
+		return utils.Fail(c, 500, "Failed to update song request")
+	}
+	return utils.OK(c, 200, "Song request updated successfully", nil)
+}
