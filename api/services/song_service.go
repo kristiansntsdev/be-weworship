@@ -475,3 +475,28 @@ func (s *SongService) UpdateSongRequestStatus(id int, status, adminNotes string)
 	}
 	return s.songs.UpdateSongRequestStatus(id, status, adminNotes)
 }
+
+func (s *SongService) ListMySongRequests(userID, page, limit int) ([]models.SongRequest, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	return s.songs.ListUserSongRequests(userID, page, limit)
+}
+
+func (s *SongService) DeleteSongRequest(id, userID int) error {
+	req, found, err := s.songs.GetSongRequestByID(id)
+	if err != nil {
+		return fmt.Errorf("internal error")
+	}
+	if !found {
+		return fmt.Errorf("not found")
+	}
+	if req.UserID != userID {
+		return fmt.Errorf("forbidden")
+	}
+	_, err = s.songs.DeleteSongRequest(id, userID)
+	return err
+}

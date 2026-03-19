@@ -300,3 +300,44 @@ func (h *Handler) UpdateSongRequest(c *fiber.Ctx) error {
 	}
 	return utils.OK(c, 200, "Song request updated successfully", nil)
 }
+
+func (h *Handler) GetMySongRequests(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Unauthorized")
+	}
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 20)
+	data, total, err := h.songs.ListMySongRequests(cl.UserID, page, limit)
+	if err != nil {
+		return utils.Fail(c, 500, "Failed to retrieve song requests")
+	}
+	return utils.OK(c, 200, "Song requests retrieved successfully", fiber.Map{
+		"data":  data,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+func (h *Handler) DeleteSongRequest(c *fiber.Ctx) error {
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid request ID")
+	}
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Unauthorized")
+	}
+	if err := h.songs.DeleteSongRequest(id, cl.UserID); err != nil {
+		switch err.Error() {
+		case "not found":
+			return utils.Fail(c, 404, "Song request not found")
+		case "forbidden":
+			return utils.Fail(c, 403, "You can only delete your own song requests")
+		default:
+			return utils.Fail(c, 500, "Failed to delete song request")
+		}
+	}
+	return utils.OK(c, 200, "Song request deleted successfully", nil)
+}
