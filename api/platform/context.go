@@ -2,11 +2,13 @@ package platform
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
+	"be-songbanks-v1/api/providers"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -14,6 +16,7 @@ type Context struct {
 	DB        *sqlx.DB
 	JWTSecret []byte
 	ClientURL string
+	FCM       *providers.FCMProvider
 }
 
 func NewContext() (*Context, error) {
@@ -29,11 +32,27 @@ func NewContext() (*Context, error) {
 		return nil, err
 	}
 
-	return &Context{
+	ctx := &Context{
 		DB:        db,
 		JWTSecret: []byte(env("SESSION_SECRET", "dev-secret")),
 		ClientURL: env("CLIENT_URL", "http://localhost:3000"),
-	}, nil
+	}
+
+	// Initialise FCM provider (optional – skipped if env vars are missing)
+	fcmProjectID := env("FCM_PROJECT_ID", "")
+	fcmCredPath := env("FCM_CREDENTIALS_PATH", "")
+	if fcmProjectID != "" && fcmCredPath != "" {
+		fcmProvider, fcmErr := providers.NewFCMProvider(fcmProjectID, fcmCredPath)
+		if fcmErr != nil {
+			log.Printf("[fcm] provider init skipped: %v", fcmErr)
+		} else {
+			ctx.FCM = fcmProvider
+		}
+	} else {
+		log.Println("[fcm] FCM_PROJECT_ID or FCM_CREDENTIALS_PATH not set – FCM disabled")
+	}
+
+	return ctx, nil
 }
 
 func buildDSN() string {
