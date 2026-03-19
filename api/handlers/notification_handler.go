@@ -89,7 +89,7 @@ func (h *Handler) GetUnreadCount(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Fail(c, 500, "Failed to fetch unread count")
 	}
-	return utils.OK(c, 200, "OK", fiber.Map{"count": count})
+	return utils.OK(c, 200, "OK", fiber.Map{"unread_count": count})
 }
 
 // MarkNotificationRead marks a single targeted notification as read.
