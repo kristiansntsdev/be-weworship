@@ -78,14 +78,14 @@ func (r *NotificationRepository) GetAllTokens() ([]string, error) {
 
 // UserID is nil for broadcast notifications (visible to all users).
 type NotificationRow struct {
-	ID        int     `db:"id"`
-	UserID    *int    `db:"user_id"`
-	Title     string  `db:"title"`
-	Message   string  `db:"message"`
-	GroupType string  `db:"group_type"`
-	IsRead    bool    `db:"is_read"`
-	Data      string  `db:"data"`
-	CreatedAt string  `db:"createdAt"`
+	ID        int     `db:"id"         json:"id"`
+	UserID    *int    `db:"user_id"    json:"user_id,omitempty"`
+	Title     string  `db:"title"      json:"title"`
+	Message   string  `db:"message"    json:"message"`
+	GroupType string  `db:"group_type" json:"group_type"`
+	IsRead    bool    `db:"is_read"    json:"is_read"`
+	Data      string  `db:"data"       json:"data,omitempty"`
+	CreatedAt string  `db:"createdAt"  json:"createdAt"`
 }
 
 // SaveNotification persists a targeted notification to the inbox for a specific user.
