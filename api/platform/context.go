@@ -16,7 +16,7 @@ type Context struct {
 	DB        *sqlx.DB
 	JWTSecret []byte
 	ClientURL string
-	FCM       *providers.FCMProvider
+	Push      *providers.ExpoPushProvider
 }
 
 func NewContext() (*Context, error) {
@@ -36,27 +36,9 @@ func NewContext() (*Context, error) {
 		DB:        db,
 		JWTSecret: []byte(env("SESSION_SECRET", "dev-secret")),
 		ClientURL: env("CLIENT_URL", "http://localhost:3000"),
+		Push:      providers.NewExpoPushProvider(),
 	}
-
-	// Initialise FCM provider (optional – skipped if env vars are missing).
-	// Supports two credential modes:
-	//   - FCM_CREDENTIALS_JSON (Vercel/production): raw service-account JSON content
-	//   - FCM_CREDENTIALS_PATH (local dev): path to service-account JSON file
-	fcmProjectID := env("FCM_PROJECT_ID", "")
-	fcmCredPath := env("FCM_CREDENTIALS_PATH", "")
-	fcmCredsJSON := os.Getenv("FCM_CREDENTIALS_JSON")
-	if fcmProjectID != "" && (fcmCredPath != "" || fcmCredsJSON != "") {
-		log.Printf("[fcm] initialising (project=%s, json_env=%v, path=%q)", fcmProjectID, fcmCredsJSON != "", fcmCredPath)
-		fcmProvider, fcmErr := providers.NewFCMProvider(fcmProjectID, fcmCredPath)
-		if fcmErr != nil {
-			log.Printf("[fcm] provider init failed: %v", fcmErr)
-		} else {
-			ctx.FCM = fcmProvider
-		}
-	} else {
-		log.Printf("[fcm] disabled (FCM_PROJECT_ID=%q, FCM_CREDENTIALS_PATH=%q, FCM_CREDENTIALS_JSON set=%v)",
-			fcmProjectID, fcmCredPath, fcmCredsJSON != "")
-	}
+	log.Printf("[push] Expo Push provider initialised")
 
 	return ctx, nil
 }

@@ -65,7 +65,17 @@ func (r *NotificationRepository) GetTokensByUserIDs(userIDs []int) ([]string, er
 	return tokens, nil
 }
 
-// NotificationRow is a single notification inbox entry.
+// GetAllTokens returns all non-expired device tokens across all users (for broadcast sends).
+func (r *NotificationRepository) GetAllTokens() ([]string, error) {
+	var tokens []string
+	err := r.db.Select(&tokens,
+		`SELECT token FROM device_tokens WHERE "updatedAt" >= $1`,
+		time.Now().Add(-7*24*time.Hour),
+	)
+	return tokens, err
+}
+
+
 // UserID is nil for broadcast notifications (visible to all users).
 type NotificationRow struct {
 	ID        int     `db:"id"`

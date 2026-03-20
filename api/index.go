@@ -80,7 +80,7 @@ func buildApp() (*fiber.App, error) {
 	auditSvc := services.NewAuditService(auditRepo)
 
 	notifRepo := repositories.NewNotificationRepository(ctx.DB)
-	notifSvc := services.NewNotificationService(ctx.FCM, notifRepo)
+	notifSvc := services.NewNotificationService(ctx.Push, notifRepo)
 
 	authMW := middleware.NewAuthMiddleware(authSvc)
 	h := handlers.NewHandler(authMW, authSvc, songSvc, tagSvc, playlistSvc, teamSvc, userSvc, analyticsSvc, auditSvc, notifSvc)
