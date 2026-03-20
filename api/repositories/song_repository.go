@@ -145,13 +145,21 @@ func (r *SongRepository) ExistsByID(id int) (bool, error) {
 
 func (r *SongRepository) ListArtistsRaw() ([]string, error) {
 	rows := []string{}
-	err := r.db.Select(&rows, `SELECT artist FROM songs WHERE artist IS NOT NULL AND artist != ''`)
+	err := r.db.Select(&rows, `
+		SELECT artist FROM songs
+		WHERE artist IS NOT NULL AND artist != ''
+		  AND (lyrics_and_chords LIKE '%[%' AND lyrics_and_chords NOT LIKE '%<span%')
+		  AND dmca_takedown = false`)
 	return rows, err
 }
 
+// Count returns the number of songs with ChordPro content available.
 func (r *SongRepository) Count() (int, error) {
 	var n int
-	err := r.db.Get(&n, `SELECT COUNT(*) FROM songs`)
+	err := r.db.Get(&n, `
+		SELECT COUNT(*) FROM songs
+		WHERE (lyrics_and_chords LIKE '%[%' AND lyrics_and_chords NOT LIKE '%<span%')
+		  AND dmca_takedown = false`)
 	return n, err
 }
 
