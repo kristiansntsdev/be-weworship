@@ -46,23 +46,11 @@ func parseExternalLinks(raw string) (spotify, youtube, appleMusic *string) {
 }
 
 func (s *SongService) Artists() ([]map[string]any, error) {
-	const cacheKey = "artists:list"
-	if s.cache != nil && s.cache.Enabled() {
-		var cached []map[string]any
-		if s.cache.Get(cacheKey, &cached) {
-			log.Printf("[artists-cache] hit")
-			return cached, nil
-		}
-		log.Printf("[artists-cache] miss")
-	} else {
-		log.Printf("[artists-cache] disabled")
-	}
-
 	raws, err := s.songs.ListArtistsRaw()
 	if err != nil {
 		return nil, err
 	}
-	// Count songs per artist name
+	// Count ChordPro songs per artist name
 	counts := map[string]int{}
 	for _, r := range raws {
 		for _, a := range utils.ParseArtists(r) {
@@ -84,11 +72,6 @@ func (s *SongService) Artists() ([]map[string]any, error) {
 	sort.Slice(artists, func(i, j int) bool {
 		return artists[i]["name"].(string) < artists[j]["name"].(string)
 	})
-
-	if s.cache != nil && s.cache.Enabled() {
-		s.cache.Set(cacheKey, artists)
-		log.Printf("[artists-cache] set")
-	}
 	return artists, nil
 }
 
