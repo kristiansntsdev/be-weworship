@@ -25,6 +25,7 @@ func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories
 }
 
 // parseExternalLinks parses a JSON external_links string into individual URL fields.
+// The admin saves keys as "Spotify", "Youtube", "Apple Music" (display names).
 func parseExternalLinks(raw string) (spotify, youtube, appleMusic *string) {
 	if raw == "" {
 		return nil, nil, nil
@@ -33,15 +34,17 @@ func parseExternalLinks(raw string) (spotify, youtube, appleMusic *string) {
 	if err := json.Unmarshal([]byte(raw), &m); err != nil {
 		return nil, nil, nil
 	}
-	if v, ok := m["spotify"]; ok && v != "" {
-		spotify = &v
+	get := func(keys ...string) *string {
+		for _, k := range keys {
+			if v, ok := m[k]; ok && v != "" {
+				return &v
+			}
+		}
+		return nil
 	}
-	if v, ok := m["youtube"]; ok && v != "" {
-		youtube = &v
-	}
-	if v, ok := m["apple_music"]; ok && v != "" {
-		appleMusic = &v
-	}
+	spotify = get("Spotify", "spotify")
+	youtube = get("Youtube", "YouTube", "youtube")
+	appleMusic = get("Apple Music", "apple_music", "apple music", "AppleMusic")
 	return
 }
 
