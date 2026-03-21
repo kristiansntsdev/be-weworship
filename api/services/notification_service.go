@@ -117,6 +117,34 @@ func (s *NotificationService) NotifySongRequestUpdated(songTitle, status string,
 	}
 }
 
+// NotifyPlaylistRenamed notifies members that the playlist was renamed by the owner.
+func (s *NotificationService) NotifyPlaylistRenamed(oldName, newName string, memberIDs []int) {
+	if len(memberIDs) == 0 {
+		return
+	}
+	notifTitle := "✏️ Playlist Renamed"
+	notifBody := "\"" + oldName + "\" has been renamed to \"" + newName + "\"."
+	log.Printf("[notification] NotifyPlaylistRenamed: saving inbox rows for %d member(s)", len(memberIDs))
+	for _, uid := range memberIDs {
+		if err := s.repo.SaveNotification(uid, notifTitle, notifBody, "playlist_update", `{"type":"playlist_update"}`); err != nil {
+			log.Printf("[notification] NotifyPlaylistRenamed: SaveNotification uid=%d failed: %v", uid, err)
+		}
+	}
+	tokens, err := s.repo.GetTokensByUserIDs(memberIDs)
+	if err != nil {
+		log.Printf("[notification] NotifyPlaylistRenamed: GetTokensByUserIDs failed: %v", err)
+		return
+	}
+	log.Printf("[notification] NotifyPlaylistRenamed: sending Expo push to %d token(s)", len(tokens))
+	ctx, cancel := pushCtx()
+	defer cancel()
+	if err := s.push.Send(ctx, tokens, notifTitle, notifBody,
+		map[string]string{"type": "playlist_update", "playlist": newName},
+	); err != nil {
+		log.Printf("[notification] NotifyPlaylistRenamed: Expo send failed: %v", err)
+	}
+}
+
 // NotifyPlaylistUpdate notifies members of a playlist update, and saves inbox rows.
 func (s *NotificationService) NotifyPlaylistUpdate(playlistName string, memberIDs []int) {
 	if len(memberIDs) == 0 {

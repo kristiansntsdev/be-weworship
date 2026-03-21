@@ -64,9 +64,16 @@ func (h *Handler) UpdatePlaylist(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Fail(c, 400, "Invalid JSON")
 	}
+	// Fetch old name + member IDs before the rename so we can use the old name in the notification.
+	memberIDs, oldName, _ := h.playlists.GetTeamMembersForNotification(id)
 	status, err := h.playlists.UpdateName(id, cl.UserID, req.PlaylistName)
 	if err != nil {
 		return utils.Fail(c, status, err.Error())
+	}
+	// Notify all members except the owner who performed the rename.
+	if len(memberIDs) > 0 && oldName != req.PlaylistName {
+		others := filterOutUserID(memberIDs, cl.UserID)
+		h.notifications.NotifyPlaylistRenamed(oldName, req.PlaylistName, others)
 	}
 	return utils.OK(c, 200, "Playlist updated successfully", fiber.Map{"id": id, "playlist_name": req.PlaylistName})
 }
