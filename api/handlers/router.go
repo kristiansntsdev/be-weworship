@@ -104,6 +104,12 @@ rm := h.authMW.RequireMaintainer
 api.Post("/admin/songs", ra, rm, h.CreateSong)
 api.Put("/admin/songs/:id", ra, rm, h.UpdateSong)
 api.Delete("/admin/songs/:id", ra, rm, h.DeleteSong)
+
+// Song requests: accessible by admin and maintainer (MUST be before admin group!)
+api.Get("/admin/song-requests", ra, rm, h.GetSongRequests)
+api.Put("/admin/song-requests/:id", ra, rm, h.UpdateSongRequest)
+api.Get("/admin/fcm-status", ra, rm, h.GetFCMStatus)
+
 admin := api.Group("/admin", ra, h.authMW.RequireAdmin)
 admin.Get("/users", h.GetUsers)
 
@@ -113,12 +119,6 @@ admin.Get("/analytics/users", h.GetAnalyticsUsers)
 admin.Get("/analytics/searches", h.GetAnalyticsSearches)
 admin.Get("/analytics/sessions", h.GetAnalyticsSessions)
 admin.Get("/analytics/performance", h.GetAnalyticsPerformance)
-
-// Song requests (admin)
-// Song requests: accessible by admin and maintainer
-api.Get("/admin/song-requests", ra, rm, h.GetSongRequests)
-api.Put("/admin/song-requests/:id", ra, rm, h.UpdateSongRequest)
-api.Get("/admin/fcm-status", ra, rm, h.GetFCMStatus)
 
 // Audit log
 admin.Get("/audit-logs", h.GetAuditLogs)
