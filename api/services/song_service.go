@@ -455,9 +455,9 @@ func (s *SongService) ListSongRequests(status string, page, limit int) ([]models
 }
 
 func (s *SongService) UpdateSongRequestStatus(id int, status, adminNotes string) error {
-	validStatuses := map[string]bool{"pending": true, "approved": true, "rejected": true}
+	validStatuses := map[string]bool{"pending": true, "in_progress": true, "approved": true, "rejected": true}
 	if !validStatuses[status] {
-		return fmt.Errorf("invalid status: must be pending, approved, or rejected")
+		return fmt.Errorf("invalid status: must be pending, in_progress, approved, or rejected")
 	}
 	return s.songs.UpdateSongRequestStatus(id, status, adminNotes)
 }
