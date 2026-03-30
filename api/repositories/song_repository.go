@@ -197,12 +197,17 @@ func (r *SongRepository) ListSongRequests(status string, page, limit int) ([]mod
 		return nil, 0, err
 	}
 
-	rows := []models.SongRequest{}
+	dbRows := []models.SongRequestRow{}
 	args = append(args, limit, offset)
 	q := r.db.Rebind(`SELECT id, user_id, song_title, reference_link, status, admin_notes, "createdAt", "updatedAt"
 		FROM song_requests WHERE ` + where + ` ORDER BY "createdAt" DESC LIMIT ? OFFSET ?`)
-	if err := r.db.Select(&rows, q, args...); err != nil {
+	if err := r.db.Select(&dbRows, q, args...); err != nil {
 		return nil, 0, err
+	}
+
+	rows := make([]models.SongRequest, len(dbRows))
+	for i, dbRow := range dbRows {
+		rows[i] = *dbRow.ToSongRequest()
 	}
 	return rows, total, nil
 }
@@ -216,15 +221,18 @@ func (r *SongRepository) UpdateSongRequestStatus(id int, status, adminNotes stri
 }
 
 func (r *SongRepository) GetSongRequestByID(id int) (*models.SongRequest, bool, error) {
-	req := &models.SongRequest{}
+	dbRow := &models.SongRequestRow{}
 	err := r.db.QueryRowx(
 		`SELECT id, user_id, song_title, reference_link, status, admin_notes, "createdAt", "updatedAt" FROM song_requests WHERE id = $1`,
 		id,
-	).StructScan(req)
+	).StructScan(dbRow)
 	if err == sql.ErrNoRows {
 		return nil, false, nil
 	}
-	return req, err == nil, err
+	if err != nil {
+		return nil, false, err
+	}
+	return dbRow.ToSongRequest(), true, nil
 }
 
 func (r *SongRepository) ListUserSongRequests(userID, page, limit int) ([]models.SongRequest, int, error) {
@@ -233,13 +241,20 @@ func (r *SongRepository) ListUserSongRequests(userID, page, limit int) ([]models
 	if err := r.db.QueryRowx(`SELECT COUNT(*) FROM song_requests WHERE user_id = $1`, userID).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	rows := []models.SongRequest{}
-	err := r.db.Select(&rows,
+	dbRows := []models.SongRequestRow{}
+	err := r.db.Select(&dbRows,
 		`SELECT id, user_id, song_title, reference_link, status, admin_notes, "createdAt", "updatedAt"
 		 FROM song_requests WHERE user_id = $1 ORDER BY "createdAt" DESC LIMIT $2 OFFSET $3`,
 		userID, limit, offset,
 	)
-	return rows, total, err
+	if err != nil {
+		return nil, 0, err
+	}
+	rows := make([]models.SongRequest, len(dbRows))
+	for i, dbRow := range dbRows {
+		rows[i] = *dbRow.ToSongRequest()
+	}
+	return rows, total, nil
 }
 
 func (r *SongRepository) DeleteSongRequest(id, userID int) (bool, error) {
