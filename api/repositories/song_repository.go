@@ -26,15 +26,15 @@ func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOr
 		// Split search into words and search for each word (handles HTML/chord markup between words)
 		words := strings.Fields(strings.TrimSpace(search))
 		if len(words) == 1 {
-			// Single word: search as before
-			where = append(where, `(s.title ILIKE ? OR s.artist ILIKE ? OR s.lyrics_and_chords ILIKE ?)`)
+			// Single word: search in title, artist, or plain_lyrics
+			where = append(where, `(s.title ILIKE ? OR s.artist ILIKE ? OR COALESCE(s.plain_lyrics, s.lyrics_and_chords) ILIKE ?)`)
 			like := "%" + words[0] + "%"
 			args = append(args, like, like, like)
 		} else {
 			// Multiple words: each word must appear somewhere in title, artist, or lyrics
 			wordConditions := make([]string, len(words))
 			for i, word := range words {
-				wordConditions[i] = `(s.title ILIKE ? OR s.artist ILIKE ? OR s.lyrics_and_chords ILIKE ?)`
+				wordConditions[i] = `(s.title ILIKE ? OR s.artist ILIKE ? OR COALESCE(s.plain_lyrics, s.lyrics_and_chords) ILIKE ?)`
 				like := "%" + word + "%"
 				args = append(args, like, like, like)
 			}
@@ -110,8 +110,15 @@ func (r *SongRepository) GetBySlug(slug string) (*models.Song, error) {
 }
 
 func (r *SongRepository) Create(title, artistJSON string, baseChord *string, bpm *int, lyrics *string, externalLinks *string, dmcaTakedown bool, dmcaStatusNotes *string, baseSlug string) (int, error) {
+	// Extract plain lyrics from formatted lyrics
+	var plainLyrics *string
+	if lyrics != nil && *lyrics != "" {
+		plain := utils.ExtractPlainLyrics(*lyrics)
+		plainLyrics = &plain
+	}
+	
 	var id int
-	err := r.db.QueryRow(r.db.Rebind(`INSERT INTO songs (slug,title,artist,base_chord,bpm,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,NOW(),NOW()) RETURNING id`), baseSlug, title, artistJSON, baseChord, bpm, lyrics, externalLinks, dmcaTakedown, dmcaStatusNotes).Scan(&id)
+	err := r.db.QueryRow(r.db.Rebind(`INSERT INTO songs (slug,title,artist,base_chord,bpm,lyrics_and_chords,plain_lyrics,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),NOW()) RETURNING id`), baseSlug, title, artistJSON, baseChord, bpm, lyrics, plainLyrics, externalLinks, dmcaTakedown, dmcaStatusNotes).Scan(&id)
 	if err != nil {
 		return 0, err
 	}

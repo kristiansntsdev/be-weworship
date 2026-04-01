@@ -14,8 +14,13 @@ import (
 )
 
 var (
-	reNonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
-	reDashes   = regexp.MustCompile(`-{2,}`)
+	reNonAlnum      = regexp.MustCompile(`[^a-z0-9]+`)
+	reDashes        = regexp.MustCompile(`-{2,}`)
+	reHTML          = regexp.MustCompile(`<[^>]+>`)
+	reChordPro      = regexp.MustCompile(`\[[^\]]+\]`)
+	reDirective     = regexp.MustCompile(`\{[^}]+\}`)
+	reMultiNewlines = regexp.MustCompile(`\n{3,}`)
+	reSpaces        = regexp.MustCompile(`[ \t]+`)
 )
 
 // Slugify converts a string to a URL-safe slug, e.g. "Amazing Grace" → "amazing-grace".
@@ -139,4 +144,29 @@ func ParseCSVInts(raw string) []int {
 		}
 	}
 	return out
+}
+
+// ExtractPlainLyrics strips HTML, ChordPro markup, and chord tags from lyrics
+func ExtractPlainLyrics(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	text := input
+
+	// Remove HTML tags
+	text = reHTML.ReplaceAllString(text, "")
+
+	// Remove ChordPro format chords: [C], [Am], [G/B], etc.
+	text = reChordPro.ReplaceAllString(text, "")
+
+	// Remove {directive} tags like {textcolor}, {sot}, {eot}
+	text = reDirective.ReplaceAllString(text, "")
+
+	// Remove extra whitespace/newlines
+	text = reMultiNewlines.ReplaceAllString(text, "\n\n")
+	text = reSpaces.ReplaceAllString(text, " ")
+	text = strings.TrimSpace(text)
+
+	return text
 }

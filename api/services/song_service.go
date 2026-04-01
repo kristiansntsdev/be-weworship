@@ -301,6 +301,10 @@ func (s *SongService) Update(songID int, title *string, artist any, baseChord *s
 	if lyrics != nil {
 		parts = append(parts, "lyrics_and_chords=?")
 		args = append(args, lyrics)
+		// Auto-extract plain lyrics when lyrics are updated
+		plainLyrics := utils.ExtractPlainLyrics(*lyrics)
+		parts = append(parts, "plain_lyrics=?")
+		args = append(args, plainLyrics)
 	}
 	if externalLinks != nil {
 		parts = append(parts, "external_links=?")
