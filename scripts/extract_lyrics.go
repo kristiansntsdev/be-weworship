@@ -5,39 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
-	"strings"
 
+	"be-songbanks-v1/api/utils"
 	_ "github.com/lib/pq"
 )
-
-// ExtractPlainLyrics strips HTML, ChordPro markup, and chord tags from lyrics
-func ExtractPlainLyrics(input string) string {
-	if input == "" {
-		return ""
-	}
-
-	text := input
-
-	// Remove HTML tags
-	htmlRegex := regexp.MustCompile(`<[^>]+>`)
-	text = htmlRegex.ReplaceAllString(text, "")
-
-	// Remove ChordPro format chords: [C], [Am], [G/B], etc.
-	chordProRegex := regexp.MustCompile(`\[[^\]]+\]`)
-	text = chordProRegex.ReplaceAllString(text, "")
-
-	// Remove {directive} tags like {textcolor}, {sot}, {eot}
-	directiveRegex := regexp.MustCompile(`\{[^}]+\}`)
-	text = directiveRegex.ReplaceAllString(text, "")
-
-	// Remove extra whitespace/newlines
-	text = regexp.MustCompile(`\n{3,}`).ReplaceAllString(text, "\n\n")
-	text = regexp.MustCompile(`[ \t]+`).ReplaceAllString(text, " ")
-	text = strings.TrimSpace(text)
-
-	return text
-}
 
 func main() {
 	dbURL := os.Getenv("DATABASE_URL")
@@ -95,7 +66,7 @@ func main() {
 			continue
 		}
 
-		plainLyrics := ExtractPlainLyrics(lyricsAndChords.String)
+		plainLyrics := utils.ExtractPlainLyrics(lyricsAndChords.String)
 
 		if plainLyrics == "" {
 			skipped++
