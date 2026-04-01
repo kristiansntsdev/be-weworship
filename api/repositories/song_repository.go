@@ -23,9 +23,23 @@ func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOr
 	args := []any{}
 
 	if strings.TrimSpace(search) != "" {
-		where = append(where, `(s.title ILIKE ? OR s.artist ILIKE ? OR s.lyrics_and_chords ILIKE ?)`)
-		like := "%" + strings.TrimSpace(search) + "%"
-		args = append(args, like, like, like)
+		// Split search into words and search for each word (handles HTML/chord markup between words)
+		words := strings.Fields(strings.TrimSpace(search))
+		if len(words) == 1 {
+			// Single word: search as before
+			where = append(where, `(s.title ILIKE ? OR s.artist ILIKE ? OR s.lyrics_and_chords ILIKE ?)`)
+			like := "%" + words[0] + "%"
+			args = append(args, like, like, like)
+		} else {
+			// Multiple words: each word must appear somewhere in title, artist, or lyrics
+			wordConditions := make([]string, len(words))
+			for i, word := range words {
+				wordConditions[i] = `(s.title ILIKE ? OR s.artist ILIKE ? OR s.lyrics_and_chords ILIKE ?)`
+				like := "%" + word + "%"
+				args = append(args, like, like, like)
+			}
+			where = append(where, "("+strings.Join(wordConditions, " AND ")+")")
+		}
 	}
 	if strings.TrimSpace(baseChord) != "" {
 		where = append(where, `s.base_chord ILIKE ?`)
