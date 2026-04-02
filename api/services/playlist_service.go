@@ -312,6 +312,9 @@ func (s *PlaylistService) loadWithAccess(playlistID, userID int) (*models.Playli
 	if team.LeadID == userID {
 		return pl, "leader", nil
 	}
+	if utils.ContainsInt(utils.ParseIntSlice(team.CoLeadsRaw.String), userID) {
+		return pl, "co-lead", nil
+	}
 	if utils.ContainsInt(utils.ParseIntSlice(team.MembersRaw.String), userID) {
 		return pl, "member", nil
 	}

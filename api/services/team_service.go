@@ -39,13 +39,22 @@ func (s *TeamService) GetByID(teamID int) (map[string]any, int, error) {
 	}
 
 	memberIDs := utils.ParseIntSlice(team.MembersRaw.String)
+	coLeadIDs := utils.ParseIntSlice(team.CoLeadsRaw.String)
 
-	// Fetch all users (leader + members) in a single query
-	allIDs := make([]int, 0, len(memberIDs)+1)
-	allIDs = append(allIDs, team.LeadID)
-	for _, id := range memberIDs {
-		if id != team.LeadID {
+	// Fetch all users (leader + co-leads + members) in a single query
+	seen := map[int]struct{}{}
+	allIDs := []int{team.LeadID}
+	seen[team.LeadID] = struct{}{}
+	for _, id := range coLeadIDs {
+		if _, ok := seen[id]; !ok {
 			allIDs = append(allIDs, id)
+			seen[id] = struct{}{}
+		}
+	}
+	for _, id := range memberIDs {
+		if _, ok := seen[id]; !ok {
+			allIDs = append(allIDs, id)
+			seen[id] = struct{}{}
 		}
 	}
 	users, err := s.users.FindManyByIDs(allIDs)
@@ -62,6 +71,13 @@ func (s *TeamService) GetByID(teamID int) (map[string]any, int, error) {
 		leaderMap = lm
 	}
 
+	coLeadRows := make([]map[string]any, 0, len(coLeadIDs))
+	for _, id := range coLeadIDs {
+		if um, ok := userMap[id]; ok {
+			coLeadRows = append(coLeadRows, um)
+		}
+	}
+
 	memberRows := make([]map[string]any, 0, len(memberIDs))
 	for _, id := range memberIDs {
 		if um, ok := userMap[id]; ok {
@@ -74,6 +90,7 @@ func (s *TeamService) GetByID(teamID int) (map[string]any, int, error) {
 		"playlist_id": team.PlaylistID,
 		"lead_id":     team.LeadID,
 		"leader":      leaderMap,
+		"co_leads":    coLeadRows,
 		"members":     memberRows,
 		"createdAt":   utils.NullableTime(team.CreatedAt),
 		"updatedAt":   utils.NullableTime(team.UpdatedAt),
@@ -123,6 +140,53 @@ func (s *TeamService) Leave(teamID, requesterID int) (int, error) {
 		}
 	}
 	if err := s.teams.UpdateMembers(teamID, next); err != nil {
+		return 500, err
+	}
+	return 200, nil
+}
+
+func (s *TeamService) PromoteToCoLead(teamID, requesterID, memberID int) (int, error) {
+	team, err := s.teams.GetByID(teamID)
+	if err != nil || team == nil {
+		return 404, fmt.Errorf("playlist team not found")
+	}
+	if team.LeadID != requesterID {
+		return 403, fmt.Errorf("access denied. only team leader can promote co-leads.")
+	}
+	members := utils.ParseIntSlice(team.MembersRaw.String)
+	if !utils.ContainsInt(members, memberID) {
+		return 400, fmt.Errorf("user is not a member of this team")
+	}
+	coLeads := utils.ParseIntSlice(team.CoLeadsRaw.String)
+	if utils.ContainsInt(coLeads, memberID) {
+		return 400, fmt.Errorf("user is already a co-lead")
+	}
+	coLeads = append(coLeads, memberID)
+	if err := s.teams.UpdateCoLeads(teamID, coLeads); err != nil {
+		return 500, err
+	}
+	return 200, nil
+}
+
+func (s *TeamService) DemoteCoLead(teamID, requesterID, coLeadID int) (int, error) {
+	team, err := s.teams.GetByID(teamID)
+	if err != nil || team == nil {
+		return 404, fmt.Errorf("playlist team not found")
+	}
+	if team.LeadID != requesterID {
+		return 403, fmt.Errorf("access denied. only team leader can demote co-leads.")
+	}
+	coLeads := utils.ParseIntSlice(team.CoLeadsRaw.String)
+	if !utils.ContainsInt(coLeads, coLeadID) {
+		return 404, fmt.Errorf("user is not a co-lead of this team")
+	}
+	next := []int{}
+	for _, id := range coLeads {
+		if id != coLeadID {
+			next = append(next, id)
+		}
+	}
+	if err := s.teams.UpdateCoLeads(teamID, next); err != nil {
 		return 500, err
 	}
 	return 200, nil

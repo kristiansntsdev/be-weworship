@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS playlist_teams (
     playlist_id INTEGER   NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
     lead_id     INTEGER   NOT NULL REFERENCES users(id),
     members     TEXT,
+    co_leads    TEXT,
     "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
 );

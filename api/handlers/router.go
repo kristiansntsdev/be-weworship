@@ -97,6 +97,8 @@ api.Get("/playlist-teams/:id", ra, h.GetTeamByID)
 api.Delete("/playlist-teams/:id/members/:user_id", ra, h.RemoveMember)
 api.Delete("/playlist-teams/:id", ra, h.DeleteTeam)
 api.Post("/playlist-teams/:id/leave", ra, h.LeaveTeam)
+api.Post("/playlist-teams/:id/co-leads", ra, h.PromoteCoLead)
+api.Delete("/playlist-teams/:id/co-leads/:user_id", ra, h.DemoteCoLead)
 
 // ── Admin routes ───────────────────────────────────────────────────────
 // Song CRUD: accessible by admin or maintainer

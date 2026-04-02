@@ -67,6 +67,42 @@ func (h *Handler) LeaveTeam(c *fiber.Ctx) error {
 	return utils.OK(c, 200, "Successfully left the team", fiber.Map{"team_id": teamID, "user_id": cl.UserID})
 }
 
+func (h *Handler) PromoteCoLead(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	teamID, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid team ID")
+	}
+	var req struct {
+		UserID int `json:"user_id"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.UserID == 0 {
+		return utils.Fail(c, 400, "user_id is required")
+	}
+	status, err := h.teams.PromoteToCoLead(teamID, cl.UserID, req.UserID)
+	if err != nil {
+		return utils.Fail(c, status, err.Error())
+	}
+	return utils.OK(c, 200, "Member promoted to co-lead successfully", fiber.Map{"team_id": teamID, "user_id": req.UserID})
+}
+
+func (h *Handler) DemoteCoLead(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	teamID, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid team ID")
+	}
+	coLeadID, err := parseID(c, "user_id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid user ID")
+	}
+	status, err := h.teams.DemoteCoLead(teamID, cl.UserID, coLeadID)
+	if err != nil {
+		return utils.Fail(c, status, err.Error())
+	}
+	return utils.OK(c, 200, "Co-lead demoted successfully", fiber.Map{"team_id": teamID, "user_id": coLeadID})
+}
+
 func (h *Handler) DeleteTeam(c *fiber.Ctx) error {
 	cl := middleware.GetClaims(c)
 	teamID, err := parseID(c, "id")

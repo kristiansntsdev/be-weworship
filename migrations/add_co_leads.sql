@@ -1,0 +1,1 @@
+ALTER TABLE playlist_teams ADD COLUMN IF NOT EXISTS co_leads TEXT;
