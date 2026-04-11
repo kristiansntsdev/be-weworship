@@ -121,7 +121,7 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 		log.Printf("[songs-cache] disabled key=%s", cacheKey)
 	}
 
-	sortMap := map[string]string{"createdAt": `s."createdAt"`, "updatedAt": `s."updatedAt"`, "title": "s.title"}
+	sortMap := map[string]string{"createdAt": `s."createdAt"`, "updatedAt": `s."updatedAt"`, "title": "s.title", "bpm": "s.bpm", "base_chord": "s.base_chord"}
 	mappedSort := sortMap[sortBy]
 	if mappedSort == "" {
 		mappedSort = `s."createdAt"`
