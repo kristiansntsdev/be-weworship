@@ -22,6 +22,12 @@ func NewPlaylistRepository(db *sqlx.DB) *PlaylistRepository {
 	)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_pse_created ON playlist_share_events ("createdAt")`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_pse_playlist ON playlist_share_events (playlist_id)`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS playlist_song_keys (
+		playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+		song_id     INTEGER NOT NULL,
+		base_chord  VARCHAR(10) NOT NULL,
+		PRIMARY KEY (playlist_id, song_id)
+	)`)
 	return &PlaylistRepository{db: db}
 }
 
@@ -185,4 +191,36 @@ func (r *PlaylistRepository) ExistsAndOwner(playlistID int) (int, error) {
 		return 0, nil
 	}
 	return userID, err
+}
+
+func (r *PlaylistRepository) SetSongKey(playlistID, songID int, baseChord string) error {
+	_, err := r.db.Exec(r.db.Rebind(`
+		INSERT INTO playlist_song_keys (playlist_id, song_id, base_chord)
+		VALUES (?, ?, ?)
+		ON CONFLICT (playlist_id, song_id) DO UPDATE SET base_chord = EXCLUDED.base_chord
+	`), playlistID, songID, baseChord)
+	return err
+}
+
+func (r *PlaylistRepository) GetSongKeys(playlistID int) (map[int]string, error) {
+	rows, err := r.db.Query(r.db.Rebind(`SELECT song_id, base_chord FROM playlist_song_keys WHERE playlist_id = ?`), playlistID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := map[int]string{}
+	for rows.Next() {
+		var songID int
+		var baseChord string
+		if err := rows.Scan(&songID, &baseChord); err != nil {
+			return nil, err
+		}
+		result[songID] = baseChord
+	}
+	return result, rows.Err()
+}
+
+func (r *PlaylistRepository) DeleteSongKey(playlistID, songID int) error {
+	_, err := r.db.Exec(r.db.Rebind(`DELETE FROM playlist_song_keys WHERE playlist_id = ? AND song_id = ?`), playlistID, songID)
+	return err
 }

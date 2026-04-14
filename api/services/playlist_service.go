@@ -74,7 +74,14 @@ func (s *PlaylistService) GetByIDWithAccess(playlistID, userID int) (map[string]
 	if err != nil {
 		return nil, 500, err
 	}
-	resp := map[string]any{"id": pl.ID, "playlist_name": pl.PlaylistName, "user_id": pl.UserID, "songs": utils.ParseIntSlice(pl.SongsRaw.String), "playlist_notes": utils.ParseAnyJSON(pl.PlaylistNotesRaw.String), "createdAt": pl.CreatedAt, "updatedAt": pl.UpdatedAt, "access_type": access}
+	songIDs := utils.ParseIntSlice(pl.SongsRaw.String)
+	songKeys, _ := s.playlists.GetSongKeys(playlistID)
+	// Convert map[int]string → map[string]string for JSON serialization
+	songKeysOut := make(map[string]string, len(songKeys))
+	for id, chord := range songKeys {
+		songKeysOut[fmt.Sprintf("%d", id)] = chord
+	}
+	resp := map[string]any{"id": pl.ID, "playlist_name": pl.PlaylistName, "user_id": pl.UserID, "songs": songIDs, "song_keys": songKeysOut, "playlist_notes": utils.ParseAnyJSON(pl.PlaylistNotesRaw.String), "createdAt": pl.CreatedAt, "updatedAt": pl.UpdatedAt, "access_type": access}
 	if pl.IsShared {
 		resp["sharable_link"] = utils.NullableString(pl.ShareableURL)
 		resp["share_token"] = utils.NullableString(pl.ShareToken)
@@ -209,7 +216,14 @@ func (s *PlaylistService) AddSongWithBaseChord(playlistID, userID, songID int, b
 	if strings.TrimSpace(baseChord) == "" {
 		return 400, fmt.Errorf("base_chord is required")
 	}
-	return s.AddSongs(playlistID, userID, []int{songID})
+	status, err := s.AddSongs(playlistID, userID, []int{songID})
+	if err != nil {
+		return status, err
+	}
+	if err := s.playlists.SetSongKey(playlistID, songID, strings.TrimSpace(baseChord)); err != nil {
+		return 500, err
+	}
+	return 200, nil
 }
 
 func (s *PlaylistService) ReorderSongs(playlistID, userID int, songIDs []int) (int, error) {
@@ -271,6 +285,8 @@ func (s *PlaylistService) RemoveSong(playlistID, userID, songID int) (int, error
 	if err := s.playlists.SetSongs(playlistID, next); err != nil {
 		return 500, err
 	}
+	// Remove the per-playlist key for this song (best-effort)
+	_ = s.playlists.DeleteSongKey(playlistID, songID)
 	return 200, nil
 }
 
