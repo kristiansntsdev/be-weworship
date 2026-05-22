@@ -1,9 +1,34 @@
 package handlers
 
 import (
-"be-songbanks-v1/api/utils"
-"github.com/gofiber/fiber/v2"
+	"strings"
+
+	"be-songbanks-v1/api/utils"
+	"github.com/gofiber/fiber/v2"
 )
+
+func (h *Handler) RequestAccountDeletion(c *fiber.Ctx) error {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid request body")
+	}
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	if req.Email == "" {
+		return utils.Fail(c, 400, "Email is required")
+	}
+
+	ip := c.IP()
+	if forwarded := c.Get("X-Forwarded-For"); forwarded != "" {
+		ip = strings.SplitN(forwarded, ",", 2)[0]
+	}
+
+	if err := h.users.RequestDeletion(req.Email, ip); err != nil {
+		return utils.Fail(c, 500, "Failed to submit deletion request")
+	}
+	return utils.OK(c, 200, "Your deletion request has been received. Your account and data will be removed within 30 days.", nil)
+}
 
 func (h *Handler) GetUsers(c *fiber.Ctx) error {
 page := c.QueryInt("page", 1)

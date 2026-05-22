@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"database/sql"
+
 	"be-songbanks-v1/api/models"
 	"github.com/jmoiron/sqlx"
 )
@@ -76,6 +78,23 @@ return &u, nil
 }
 
 func (r *UserRepository) UpdateAvatarURL(userID int, avatarURL string) error {
-_, err := r.db.Exec(`UPDATE users SET avatar_url = $1, "updatedAt" = NOW() WHERE id = $2`, avatarURL, userID)
-return err
+	_, err := r.db.Exec(`UPDATE users SET avatar_url = $1, "updatedAt" = NOW() WHERE id = $2`, avatarURL, userID)
+	return err
+}
+
+func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
+	var u models.User
+	err := r.db.Get(&u, `SELECT id,name,email,role,provider,verified,status,"createdAt","updatedAt" FROM users WHERE email = $1 LIMIT 1`, email)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &u, err
+}
+
+func (r *UserRepository) CreateDeletionRequest(email string, userID *int, ipAddress string) error {
+	_, err := r.db.Exec(
+		`INSERT INTO deletion_requests (email, user_id, ip_address) VALUES ($1, $2, $3)`,
+		email, userID, ipAddress,
+	)
+	return err
 }

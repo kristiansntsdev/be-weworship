@@ -41,12 +41,24 @@ return s.repo.UpdateAvatarURL(userID, avatarURL)
 }
 
 func (s *UserService) GetAvatarURL(userID int) (string, error) {
-u, err := s.repo.FindByID(userID)
-if err != nil {
-return "", err
+	u, err := s.repo.FindByID(userID)
+	if err != nil {
+		return "", err
+	}
+	if u.AvatarURL.Valid {
+		return u.AvatarURL.String, nil
+	}
+	return "", nil
 }
-if u.AvatarURL.Valid {
-return u.AvatarURL.String, nil
-}
-return "", nil
+
+func (s *UserService) RequestDeletion(email, ipAddress string) error {
+	var userID *int
+	u, err := s.repo.FindByEmail(email)
+	if err != nil {
+		return err
+	}
+	if u != nil {
+		userID = &u.ID
+	}
+	return s.repo.CreateDeletionRequest(email, userID, ipAddress)
 }
