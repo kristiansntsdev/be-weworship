@@ -258,24 +258,37 @@ return utils.OK(c, 200, "State updated", fiber.Map{"song_index": req.SongIndex, 
 }
 
 func (h *Handler) GetLiveState(c *fiber.Ctx) error {
-id, err := parseID(c, "id")
-if err != nil {
-return utils.Fail(c, 400, "Invalid playlist ID")
-}
-state, err := h.playlists.GetLiveState(id)
-if err != nil {
-return utils.Fail(c, 500, "Failed to get live state")
-}
-if state == nil {
-return utils.OK(c, 200, "No active live session", fiber.Map{"is_active": false})
-}
-return utils.OK(c, 200, "Live state", fiber.Map{
-"is_active":      state.IsActive,
-"song_index":     state.SongIndex,
-"scroll_ratio":   state.ScrollRatio,
-"leader_user_id": state.LeaderUserID,
-"updated_at":     state.UpdatedAt,
-})
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	state, err := h.playlists.GetLiveState(id)
+	if err != nil {
+		return utils.Fail(c, 500, "Failed to get live state")
+	}
+
+	// Resolve viewer_role: authenticated members get their role from playlist_members;
+	// unauthenticated callers (and members with no row) get "guest".
+	var viewerUserID int
+	if cl := middleware.GetClaims(c); cl != nil {
+		viewerUserID = cl.UserID
+	}
+	viewerRole := h.playlists.GetViewerRole(id, viewerUserID)
+
+	if state == nil {
+		return utils.OK(c, 200, "No active live session", fiber.Map{
+			"is_active":   false,
+			"viewer_role": viewerRole,
+		})
+	}
+	return utils.OK(c, 200, "Live state", fiber.Map{
+		"is_active":      state.IsActive,
+		"song_index":     state.SongIndex,
+		"scroll_ratio":   state.ScrollRatio,
+		"leader_user_id": state.LeaderUserID,
+		"updated_at":     state.UpdatedAt,
+		"viewer_role":    viewerRole,
+	})
 }
 
 func (h *Handler) GetPlaylistPreview(c *fiber.Ctx) error {

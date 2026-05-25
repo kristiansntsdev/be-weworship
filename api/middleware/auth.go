@@ -47,6 +47,20 @@ func (m *AuthMiddleware) RequireMaintainer(c *fiber.Ctx) error {
 	return c.Next()
 }
 
+// OptionalAuth tries to parse the Bearer token if present.
+// Unlike RequireAuth, it does NOT reject the request when the token is missing or invalid —
+// it simply leaves "claims" unset so handlers can treat the caller as a guest.
+func (m *AuthMiddleware) OptionalAuth(c *fiber.Ctx) error {
+	authHeader := c.Get("Authorization")
+	token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer"))
+	if token != "" {
+		if claims, err := m.auth.ParseToken(token); err == nil {
+			c.Locals("claims", claims)
+		}
+	}
+	return c.Next()
+}
+
 func GetClaims(c *fiber.Ctx) *types.Claims {
 	cl, _ := c.Locals("claims").(*types.Claims)
 	return cl

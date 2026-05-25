@@ -4,7 +4,7 @@
 -- Unified users table (replaces peserta + pengurus)
 CREATE TABLE IF NOT EXISTS users (
     id           SERIAL PRIMARY KEY,
-    name         VARCHAR(255)        NOT NULL,
+    username     VARCHAR(30)  UNIQUE NOT NULL,
     email        VARCHAR(255) UNIQUE NOT NULL,
     password     TEXT,                              -- null for OAuth-only users
     avatar_url   TEXT,
@@ -74,6 +74,17 @@ CREATE TABLE IF NOT EXISTS playlist_teams (
     "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Per-member role assignments within a playlist team.
+-- role: 'singer' | 'musician' | 'md' (max 1 MD per playlist enforced in service layer)
+CREATE TABLE IF NOT EXISTS playlist_members (
+    id          SERIAL PRIMARY KEY,
+    playlist_id INTEGER     NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    user_id     INTEGER     NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+    role        VARCHAR(20) NOT NULL DEFAULT 'singer',
+    joined_at   TIMESTAMP   NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_playlist_members UNIQUE (playlist_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS users_detail (
     user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     full_name   VARCHAR(255),
@@ -141,6 +152,8 @@ CREATE INDEX IF NOT EXISTS idx_playlists_user_id        ON playlists(user_id);
 CREATE INDEX IF NOT EXISTS idx_playlists_share_token    ON playlists(share_token);
 CREATE INDEX IF NOT EXISTS idx_playlist_teams_playlist  ON playlist_teams(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_playlist_teams_lead      ON playlist_teams(lead_id);
+CREATE INDEX IF NOT EXISTS idx_playlist_members_playlist ON playlist_members(playlist_id);
+CREATE INDEX IF NOT EXISTS idx_playlist_members_user     ON playlist_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_songs_title              ON songs(title);
 CREATE INDEX IF NOT EXISTS idx_songs_artist             ON songs(artist);
 CREATE INDEX IF NOT EXISTS idx_song_events_song_id      ON song_events(song_id);

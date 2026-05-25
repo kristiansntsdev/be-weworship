@@ -136,7 +136,7 @@ func (h *Handler) CreateSong(c *fiber.Ctx) error {
 	cl := middleware.GetClaims(c)
 	if cl != nil {
 		uid := cl.UserID
-		h.audit.Log(&uid, cl.Name, cl.Email, "create", "song", nil, req.Title, map[string]any{"title": req.Title, "artist": req.Artist, "base_chord": req.BaseChord})
+		h.audit.Log(&uid, cl.Username, cl.Email, "create", "song", nil, req.Title, map[string]any{"title": req.Title, "artist": req.Artist, "base_chord": req.BaseChord})
 	}
 	// Notify when a new song is created with ChordPro content.
 	if req.LyricsAndChord != nil && isChordProContent(*req.LyricsAndChord) {
@@ -197,7 +197,7 @@ func (h *Handler) UpdateSong(c *fiber.Ctx) error {
 			changes["external_links"] = *req.ExternalLinks
 		}
 		entityName := strVal(beforeMap, "title")
-		h.audit.Log(&uid, cl.Name, cl.Email, "update", "song", &id, entityName, changes)
+		h.audit.Log(&uid, cl.Username, cl.Email, "update", "song", &id, entityName, changes)
 	}
 	// Fire notification when song transitions to ChordPro format.
 	// Triggers when: new content IS ChordPro AND old content was NOT ChordPro.
@@ -236,7 +236,7 @@ func (h *Handler) DeleteSong(c *fiber.Ctx) error {
 	if cl != nil {
 		uid := cl.UserID
 		entityName := strVal(before, "title")
-		h.audit.Log(&uid, cl.Name, cl.Email, "delete", "song", &id, entityName, nil)
+		h.audit.Log(&uid, cl.Username, cl.Email, "delete", "song", &id, entityName, nil)
 	}
 	return utils.OK(c, 200, "Song deleted successfully", fiber.Map{"id": id})
 }

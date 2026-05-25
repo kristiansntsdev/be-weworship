@@ -48,7 +48,7 @@ data := make([]fiber.Map, len(rows))
 for i, u := range rows {
 data[i] = fiber.Map{
 "id":        u.ID,
-"name":      u.Name,
+"username":  u.Username,
 "email":     u.Email,
 "role":      u.Role,
 "provider":  u.Provider,

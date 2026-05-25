@@ -2,6 +2,7 @@ package services
 
 import (
 "encoding/json"
+"errors"
 "fmt"
 "net/http"
 "net/url"
@@ -11,7 +12,9 @@ import (
 "be-songbanks-v1/api/models"
 "be-songbanks-v1/api/repositories"
 "be-songbanks-v1/api/types"
+"be-songbanks-v1/api/utils"
 "github.com/golang-jwt/jwt/v5"
+"github.com/jackc/pgx/v5/pgconn"
 "golang.org/x/crypto/bcrypt"
 )
 
@@ -25,13 +28,13 @@ MobileScheme string // Expo deep-link scheme, e.g. "weworship"
 }
 
 type AuthService struct {
-repo      *repositories.AuthRepository
-jwtSecret []byte
-google    GoogleConfig
+	repo      repositories.AuthRepoIface
+	jwtSecret []byte
+	google    GoogleConfig
 }
 
 func NewAuthService(repo *repositories.AuthRepository, jwtSecret []byte, google GoogleConfig) *AuthService {
-return &AuthService{repo: repo, jwtSecret: jwtSecret, google: google}
+	return &AuthService{repo: repo, jwtSecret: jwtSecret, google: google}
 }
 
 // GoogleAuthURL builds the Google consent-screen URL.
@@ -88,7 +91,10 @@ if err := json.NewDecoder(userRes.Body).Decode(&userJSON); err != nil || userJSO
 return "", fmt.Errorf("google userinfo response invalid")
 }
 
-user, err := s.repo.FindOrCreateGoogleUser(userJSON.Email, userJSON.Name, userJSON.ID)
+// For new Google users we generate a random username so Google's display
+// name (which may contain spaces, be too short, etc.) never hits our
+// column constraints. Existing users are returned as-is by FindOrCreate.
+user, err := s.findOrCreateGoogleUser(userJSON.Email, userJSON.ID)
 if err != nil {
 return "", fmt.Errorf("user upsert: %w", err)
 }
@@ -124,12 +130,36 @@ return s.google.ClientURL + "/auth/v2/login?error=" + errKey
 return "/?error=" + errKey
 }
 
+// findOrCreateGoogleUser wraps FindOrCreateGoogleUser with auto-generated
+// username retry logic. On a unique-constraint collision it regenerates and
+// retries up to 5 times (collision probability per attempt ≈ 1 in 2.8 billion).
+func (s *AuthService) findOrCreateGoogleUser(email, providerID string) (*models.User, error) {
+	const maxAttempts = 5
+	for i := 0; i < maxAttempts; i++ {
+		u, err := s.repo.FindOrCreateGoogleUser(email, utils.GenerateUsername(), providerID)
+		if err == nil {
+			return u, nil
+		}
+		// Only retry on username unique-constraint violation
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && strings.Contains(pgErr.ConstraintName, "username") {
+			continue
+		}
+		return nil, err
+	}
+	return nil, fmt.Errorf("could not generate a unique username after %d attempts", maxAttempts)
+}
+
 // Register creates a new local email+password account and returns a JWT.
-func (s *AuthService) Register(name, email, password string) (map[string]any, int, error) {
-	name = strings.TrimSpace(name)
+func (s *AuthService) Register(username, email, password string) (map[string]any, int, error) {
+	username = strings.TrimSpace(username)
 	email = strings.TrimSpace(email)
-	if name == "" || email == "" || password == "" {
-		return nil, 400, fmt.Errorf("name, email and password are required")
+	if username == "" || email == "" || password == "" {
+		return nil, 400, fmt.Errorf("username, email and password are required")
+	}
+	// Validate username format, length, and reserved words
+	if err := utils.ValidateUsername(username); err != nil {
+		return nil, 400, err
 	}
 	if len(password) < 6 {
 		return nil, 400, fmt.Errorf("password must be at least 6 characters")
@@ -145,8 +175,13 @@ func (s *AuthService) Register(name, email, password string) (map[string]any, in
 	if err != nil {
 		return nil, 500, fmt.Errorf("failed to hash password")
 	}
-	u, err := s.repo.CreateLocal(name, email, string(hashed))
+	u, err := s.repo.CreateLocal(username, email, string(hashed))
 	if err != nil {
+		// Unique constraint violation on username (PostgreSQL code 23505)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && strings.Contains(pgErr.ConstraintName, "username") {
+			return nil, 409, fmt.Errorf("username '%s' is already taken", username)
+		}
 		return nil, 500, err
 	}
 	token, err := s.issueToken(u)
@@ -187,10 +222,10 @@ return map[string]any{"token": token, "user": mapUser(*u)}, 200, nil
 func (s *AuthService) issueToken(u *models.User) (string, error) {
 now := time.Now()
 c := types.Claims{
-UserID: u.ID,
-Role:   u.Role,
-Name:   u.Name,
-Email:  u.Email,
+UserID:   u.ID,
+Role:     u.Role,
+Username: u.Username,
+Email:    u.Email,
 RegisteredClaims: jwt.RegisteredClaims{
 IssuedAt:  jwt.NewNumericDate(now),
 ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)),
@@ -221,7 +256,7 @@ avatarURL = u.AvatarURL.String
 }
 return map[string]any{
 "id":         u.ID,
-"name":       u.Name,
+"username":   u.Username,
 "email":      u.Email,
 "role":       u.Role,
 "provider":   u.Provider,

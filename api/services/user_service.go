@@ -6,11 +6,11 @@ import (
 )
 
 type UserService struct {
-repo *repositories.UserRepository
+	repo repositories.UserRepoIface
 }
 
 func NewUserService(repo *repositories.UserRepository) *UserService {
-return &UserService{repo: repo}
+	return &UserService{repo: repo}
 }
 
 func (s *UserService) List(search string, page, limit int) ([]models.User, int, error) {

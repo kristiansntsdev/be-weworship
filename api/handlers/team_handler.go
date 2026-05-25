@@ -58,7 +58,7 @@ func (h *Handler) LeaveTeam(c *fiber.Ctx) error {
 	}
 	// Notify the playlist owner that a member left
 	if ownerErr == nil && ownerID != cl.UserID {
-		memberName := cl.Name
+		memberName := cl.Username
 		if memberName == "" {
 			memberName = cl.Email
 		}
@@ -114,4 +114,47 @@ func (h *Handler) DeleteTeam(c *fiber.Ctx) error {
 		return utils.Fail(c, status, err.Error())
 	}
 	return utils.OK(c, 200, "Playlist team deleted successfully", fiber.Map{"id": teamID})
+}
+
+// ── Playlist member roles ─────────────────────────────────────────────────────
+
+// GetPlaylistMembers handles GET /api/playlists/:id/members
+func (h *Handler) GetPlaylistMembers(c *fiber.Ctx) error {
+	playlistID, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	data, status, err := h.teams.ListMembers(playlistID)
+	if err != nil {
+		return utils.Fail(c, status, err.Error())
+	}
+	return utils.OK(c, 200, "Playlist members retrieved successfully", data)
+}
+
+// SetPlaylistMemberRole handles PUT /api/playlists/:id/members/:userId/role
+func (h *Handler) SetPlaylistMemberRole(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	playlistID, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	targetUserID, err := parseID(c, "userId")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid user ID")
+	}
+	var req struct {
+		Role string `json:"role"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Role == "" {
+		return utils.Fail(c, 400, "role is required")
+	}
+	status, err := h.teams.SetMemberRole(playlistID, cl.UserID, targetUserID, req.Role)
+	if err != nil {
+		return utils.Fail(c, status, err.Error())
+	}
+	return utils.OK(c, 200, "Member role updated successfully", fiber.Map{
+		"playlist_id": playlistID,
+		"user_id":     targetUserID,
+		"role":        req.Role,
+	})
 }

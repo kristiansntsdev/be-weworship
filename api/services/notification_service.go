@@ -12,8 +12,8 @@ import (
 // NotificationService orchestrates push notifications via the Expo Push API.
 // Sends are synchronous so they complete before the Vercel handler returns.
 type NotificationService struct {
-	push *providers.ExpoPushProvider
-	repo *repositories.NotificationRepository
+	push providers.PushProviderIface
+	repo repositories.NotificationRepoIface
 }
 
 func NewNotificationService(push *providers.ExpoPushProvider, repo *repositories.NotificationRepository) *NotificationService {

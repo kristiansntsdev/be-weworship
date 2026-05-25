@@ -12,11 +12,11 @@ import (
 )
 
 type PlaylistService struct {
-	playlists *repositories.PlaylistRepository
-	teams     *repositories.TeamRepository
-	songs     *repositories.SongRepository
+	playlists repositories.PlaylistRepoIface
+	teams     repositories.TeamRepoIface
+	songs     repositories.SongRepoIface
 	clientURL string
-	live      *platform.LiveCache
+	live      platform.LiveCacheIface
 }
 
 func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.TeamRepository, s *repositories.SongRepository, clientURL string, live *platform.LiveCache) *PlaylistService {
@@ -377,6 +377,19 @@ func (s *PlaylistService) GetLiveState(playlistID int) (*platform.LiveState, err
 		return nil, nil
 	}
 	return s.live.GetState(playlistID)
+}
+
+// GetViewerRole returns the playlist role for a user (from playlist_members).
+// Returns "guest" if the user has no entry, or if userID is 0 (unauthenticated).
+func (s *PlaylistService) GetViewerRole(playlistID, userID int) string {
+	if userID == 0 {
+		return "guest"
+	}
+	m, err := s.teams.GetMember(playlistID, userID)
+	if err != nil || m == nil {
+		return "guest"
+	}
+	return m.Role
 }
 
 func (s *PlaylistService) GetPreview(shareToken string) (map[string]any, int, error) {

@@ -7,11 +7,11 @@ import (
 )
 
 type AnalyticsService struct {
-repo *repositories.AnalyticsRepository
+	repo repositories.AnalyticsRepoIface
 }
 
 func NewAnalyticsService(repo *repositories.AnalyticsRepository) *AnalyticsService {
-return &AnalyticsService{repo: repo}
+	return &AnalyticsService{repo: repo}
 }
 
 func (s *AnalyticsService) RecordSongEvent(songID, userID *int, eventType, platform string, durationMs *int) {

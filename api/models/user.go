@@ -7,7 +7,7 @@ import (
 
 type User struct {
 	ID         int            `db:"id"`
-	Name       string         `db:"name"`
+	Username   string         `db:"username"`
 	Email      string         `db:"email"`
 	Password   sql.NullString `db:"password"`
 	AvatarURL  sql.NullString `db:"avatar_url"`
@@ -31,7 +31,7 @@ type UserDetail struct {
 }
 
 type UserBasic struct {
-	ID    int    `db:"id"`
-	Name  string `db:"name"`
-	Email string `db:"email"`
+	ID       int    `db:"id"`
+	Username string `db:"username"`
+	Email    string `db:"email"`
 }

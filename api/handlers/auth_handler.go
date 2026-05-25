@@ -8,14 +8,14 @@ import (
 
 func (h *Handler) RegisterUser(c *fiber.Ctx) error {
 	var req struct {
-		Name     string `json:"name"`
+		Username string `json:"username"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Fail(c, 400, "Invalid JSON")
 	}
-	data, status, err := h.auth.Register(req.Name, req.Email, req.Password)
+	data, status, err := h.auth.Register(req.Username, req.Email, req.Password)
 	if err != nil {
 		return utils.Fail(c, status, err.Error())
 	}
@@ -131,7 +131,7 @@ avatarAny = avatarURL
 return utils.OK(c, 200, "Current user retrieved successfully", fiber.Map{
 "user": fiber.Map{
 "id":         cl.UserID,
-"name":       cl.Name,
+"username":   cl.Username,
 "email":      cl.Email,
 "role":       cl.Role,
 "avatar_url": avatarAny,

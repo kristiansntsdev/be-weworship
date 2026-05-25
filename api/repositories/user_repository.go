@@ -19,7 +19,7 @@ func (r *UserRepository) Count(search string) (int, error) {
 	where := `WHERE 1=1`
 	args := []any{}
 	if search != "" {
-		where += ` AND (email LIKE ? OR name LIKE ?)`
+		where += ` AND (email LIKE ? OR username LIKE ?)`
 		like := "%" + search + "%"
 		args = append(args, like, like)
 	}
@@ -33,11 +33,11 @@ func (r *UserRepository) List(search string, page, limit int) ([]models.User, er
 	where := `WHERE 1=1`
 	args := []any{}
 	if search != "" {
-		where += ` AND (email LIKE ? OR name LIKE ?)`
+		where += ` AND (email LIKE ? OR username LIKE ?)`
 		like := "%" + search + "%"
 		args = append(args, like, like)
 	}
-	query := r.db.Rebind(`SELECT id,name,email,avatar_url,role,provider,verified,status,"createdAt","updatedAt" FROM users ` + where + ` ORDER BY id DESC LIMIT ? OFFSET ?`)
+	query := r.db.Rebind(`SELECT id,username,email,avatar_url,role,provider,verified,status,"createdAt","updatedAt" FROM users ` + where + ` ORDER BY id DESC LIMIT ? OFFSET ?`)
 	args = append(args, limit, offset)
 	rows := []models.User{}
 	err := r.db.Select(&rows, query, args...)
@@ -70,7 +70,7 @@ func (r *UserRepository) UpsertDetail(userID int, fullName, province, city, post
 
 func (r *UserRepository) FindByID(userID int) (*models.User, error) {
 var u models.User
-err := r.db.Get(&u, `SELECT id, name, email, role, provider, verified, status, avatar_url, "createdAt", "updatedAt" FROM users WHERE id = $1`, userID)
+err := r.db.Get(&u, `SELECT id, username, email, role, provider, verified, status, avatar_url, "createdAt", "updatedAt" FROM users WHERE id = $1`, userID)
 if err != nil {
 return nil, err
 }
@@ -84,7 +84,7 @@ func (r *UserRepository) UpdateAvatarURL(userID int, avatarURL string) error {
 
 func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	var u models.User
-	err := r.db.Get(&u, `SELECT id,name,email,role,provider,verified,status,"createdAt","updatedAt" FROM users WHERE email = $1 LIMIT 1`, email)
+	err := r.db.Get(&u, `SELECT id,username,email,role,provider,verified,status,"createdAt","updatedAt" FROM users WHERE email = $1 LIMIT 1`, email)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

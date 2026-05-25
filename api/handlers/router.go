@@ -87,11 +87,15 @@ api.Post("/playlists/:id/songs", ra, h.AddSongsToPlaylist)
 api.Post("/playlists/:id/songs/:songId", ra, h.AddSongToPlaylistWithBaseChord)
 api.Put("/playlists/:id/reorder", ra, h.ReorderPlaylistSongs)
 	api.Delete("/playlists/:id/song/:songId", ra, h.RemoveSongFromPlaylist)
-	// Live session (GET has no auth — members poll without needing to be playlist owner)
+	// Live session (GET uses OptionalAuth — decode role if token present, guest otherwise)
 	api.Post("/playlists/:id/live", ra, h.StartLiveSession)
 	api.Delete("/playlists/:id/live", ra, h.EndLiveSession)
 	api.Put("/playlists/:id/live/state", ra, h.UpdateLiveState)
-	api.Get("/playlists/:id/live", h.GetLiveState)
+	api.Get("/playlists/:id/live", h.authMW.OptionalAuth, h.GetLiveState)
+
+	// Playlist member roles
+	api.Get("/playlists/:id/members", ra, h.GetPlaylistMembers)
+	api.Put("/playlists/:id/members/:userId/role", ra, h.SetPlaylistMemberRole)
 
 api.Get("/playlist-teams", ra, h.GetMyTeams)
 api.Get("/playlist-teams/:id", ra, h.GetTeamByID)

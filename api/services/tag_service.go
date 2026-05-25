@@ -8,7 +8,7 @@ import (
 )
 
 type TagService struct {
-	repo *repositories.TagRepository
+	repo repositories.TagRepoIface
 }
 
 func NewTagService(repo *repositories.TagRepository) *TagService {

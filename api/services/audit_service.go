@@ -3,7 +3,7 @@ package services
 import "be-songbanks-v1/api/repositories"
 
 type AuditService struct {
-	repo *repositories.AuditRepository
+	repo repositories.AuditRepoIface
 }
 
 func NewAuditService(repo *repositories.AuditRepository) *AuditService {

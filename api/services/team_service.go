@@ -8,9 +8,9 @@ import (
 )
 
 type TeamService struct {
-	teams     *repositories.TeamRepository
-	users     *repositories.AuthRepository
-	playlists *repositories.PlaylistRepository
+	teams     repositories.TeamRepoIface
+	users     repositories.AuthRepoIface
+	playlists repositories.PlaylistRepoIface
 }
 
 func NewTeamService(t *repositories.TeamRepository, u *repositories.AuthRepository, p *repositories.PlaylistRepository) *TeamService {
@@ -63,7 +63,7 @@ func (s *TeamService) GetByID(teamID int) (map[string]any, int, error) {
 	}
 	userMap := make(map[int]map[string]any, len(users))
 	for _, u := range users {
-		userMap[u.ID] = map[string]any{"id": u.ID, "name": u.Name, "email": u.Email}
+		userMap[u.ID] = map[string]any{"id": u.ID, "username": u.Username, "email": u.Email}
 	}
 
 	var leaderMap any
@@ -187,6 +187,87 @@ func (s *TeamService) DemoteCoLead(teamID, requesterID, coLeadID int) (int, erro
 		}
 	}
 	if err := s.teams.UpdateCoLeads(teamID, next); err != nil {
+		return 500, err
+	}
+	return 200, nil
+}
+
+// ── Playlist member roles ─────────────────────────────────────────────────────
+
+// ListMembers returns all playlist_members rows for a playlist, enriched with user info.
+// Any authenticated team member may call this.
+func (s *TeamService) ListMembers(playlistID int) ([]map[string]any, int, error) {
+	rows, err := s.teams.ListMembers(playlistID)
+	if err != nil {
+		return nil, 500, err
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, map[string]any{
+			"user_id": r.UserID,
+			"username": r.Username,
+			"email":   r.Email,
+			"role":    r.Role,
+		})
+	}
+	return out, 200, nil
+}
+
+// SetMemberRole sets (or updates) the role for a member in a playlist.
+// Only the team lead or an existing MD may assign roles.
+// Business rules:
+//   - role must be one of: singer, musician, md
+//   - max 1 MD per playlist; promote request is rejected if another MD already exists
+//   - target user must already be a member in playlist_members (via the backfill or join flow)
+func (s *TeamService) SetMemberRole(playlistID, requesterID, targetUserID int, role string) (int, error) {
+	// Validate role value
+	switch role {
+	case "singer", "musician", "md":
+	default:
+		return 400, fmt.Errorf("invalid role: must be 'singer', 'musician', or 'md'")
+	}
+
+	// Verify the team exists for this playlist
+	team, err := s.teams.FindByPlaylistID(playlistID)
+	if err != nil {
+		return 500, err
+	}
+	if team == nil {
+		return 404, fmt.Errorf("playlist team not found")
+	}
+
+	// Determine if requester is authorised (lead OR current MD)
+	requesterMember, err := s.teams.GetMember(playlistID, requesterID)
+	if err != nil {
+		return 500, err
+	}
+	isLead := team.LeadID == requesterID
+	isMD := requesterMember != nil && requesterMember.Role == "md"
+	if !isLead && !isMD {
+		return 403, fmt.Errorf("access denied: only the team lead or an MD can set member roles")
+	}
+
+	// Verify target user is a member of this playlist
+	targetMember, err := s.teams.GetMember(playlistID, targetUserID)
+	if err != nil {
+		return 500, err
+	}
+	if targetMember == nil {
+		return 404, fmt.Errorf("target user is not a member of this playlist")
+	}
+
+	// Enforce max-1-MD rule
+	if role == "md" && (targetMember.Role != "md") {
+		count, err := s.teams.CountByRole(playlistID, "md")
+		if err != nil {
+			return 500, err
+		}
+		if count >= 1 {
+			return 409, fmt.Errorf("playlist already has an MD — demote the current MD first")
+		}
+	}
+
+	if err := s.teams.UpsertMember(playlistID, targetUserID, role); err != nil {
 		return 500, err
 	}
 	return 200, nil

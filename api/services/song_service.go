@@ -14,10 +14,10 @@ import (
 )
 
 type SongService struct {
-	songs     *repositories.SongRepository
-	tags      *repositories.TagRepository
-	playlists *repositories.PlaylistRepository
-	cache     *platform.SongCache
+	songs     repositories.SongRepoIface
+	tags      repositories.TagRepoIface
+	playlists repositories.PlaylistRepoIface
+	cache     platform.SongCacheIface
 }
 
 func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories.TagRepository, playlistRepo *repositories.PlaylistRepository, cache *platform.SongCache) *SongService {
