@@ -11,20 +11,21 @@ import (
 )
 
 type Handler struct {
-authMW        *middleware.AuthMiddleware
-auth          *services.AuthService
-songs         *services.SongService
-tags          *services.TagService
-playlists     *services.PlaylistService
-teams         *services.TeamService
-users         *services.UserService
-analytics     *services.AnalyticsService
-audit         *services.AuditService
-notifications *services.NotificationService
+	authMW        *middleware.AuthMiddleware
+	auth          *services.AuthService
+	songs         *services.SongService
+	tags          *services.TagService
+	playlists     *services.PlaylistService
+	teams         *services.TeamService
+	users         *services.UserService
+	analytics     *services.AnalyticsService
+	audit         *services.AuditService
+	notifications *services.NotificationService
+	invitations   *services.InvitationService
 }
 
-func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService, notifications *services.NotificationService) *Handler {
-return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit, notifications: notifications}
+func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService, notifications *services.NotificationService, invitations *services.InvitationService) *Handler {
+	return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit, notifications: notifications, invitations: invitations}
 }
 
 func (h *Handler) Register(app *fiber.App) {
@@ -74,6 +75,14 @@ api.Put("/profile", ra, h.UpdateProfile)
 	api.Get("/notifications", ra, h.GetNotifications)
 	api.Get("/notifications/unread-count", ra, h.GetUnreadCount)
 	api.Post("/notifications/:id/read", ra, h.MarkNotificationRead)
+
+	// ── User search (for invite-by-username) ──────────────────────────────────
+	api.Get("/users/search", ra, h.SearchUsers)
+
+	// ── Playlist invitations ──────────────────────────────────────────────────
+	api.Post("/playlists/:id/invitations", ra, h.SendInvitation)
+	api.Post("/invitations/:id/accept",    ra, h.AcceptInvitation)
+	api.Post("/invitations/:id/decline",   ra, h.DeclineInvitation)
 
 api.Post("/playlists", ra, h.CreatePlaylist)
 api.Get("/playlists", ra, h.GetPlaylists)

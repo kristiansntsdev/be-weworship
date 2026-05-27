@@ -134,3 +134,11 @@ type AuditRepoIface interface {
 	Log(userID *int, userName, userEmail, action, entityType string, entityID *int, entityName string, changes any)
 	List(action, entityType string, userID *int, page, limit int) ([]AuditLogRow, int, error)
 }
+
+// InvitationRepoIface abstracts InvitationRepository for testing.
+type InvitationRepoIface interface {
+	CreateInvitation(playlistID, inviterID, inviteeID int) (int, error)
+	FindPendingByID(id int) (*models.PlaylistInvitation, error)
+	FindPendingByPlaylistAndInvitee(playlistID, inviteeID int) (*models.PlaylistInvitation, error)
+	UpdateStatus(id int, status string) error
+}

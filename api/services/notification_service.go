@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -170,6 +171,61 @@ func (s *NotificationService) NotifyPlaylistUpdate(playlistName string, memberID
 		map[string]string{"type": "playlist_update", "playlist": playlistName},
 	); err != nil {
 		log.Printf("[notification] NotifyPlaylistUpdate: Expo send failed: %v", err)
+	}
+}
+
+// NotifyPlaylistInvite sends an invitation notification to the invitee.
+func (s *NotificationService) NotifyPlaylistInvite(invitationID, playlistID int, playlistName, inviterName string, inviteeID int) {
+	if inviteeID == 0 {
+		return
+	}
+	notifTitle := "🎵 Playlist Invitation"
+	notifBody := inviterName + " invited you to join \"" + playlistName + "\""
+	data := fmt.Sprintf(`{"invitation_id":%d,"playlist_id":%d,"playlist_name":"%s","inviter_name":"%s"}`,
+		invitationID, playlistID, playlistName, inviterName)
+	log.Printf("[notification] NotifyPlaylistInvite: saving inbox row for inviteeID=%d invitationID=%d", inviteeID, invitationID)
+	if err := s.repo.SaveNotification(inviteeID, notifTitle, notifBody, "playlist_invite", data); err != nil {
+		log.Printf("[notification] NotifyPlaylistInvite: SaveNotification failed: %v", err)
+	}
+	tokens, err := s.repo.GetTokensByUserIDs([]int{inviteeID})
+	if err != nil {
+		log.Printf("[notification] NotifyPlaylistInvite: GetTokens failed: %v", err)
+		return
+	}
+	log.Printf("[notification] NotifyPlaylistInvite: sending Expo push to %d token(s) for inviteeID=%d", len(tokens), inviteeID)
+	ctx, cancel := pushCtx()
+	defer cancel()
+	if err := s.push.Send(ctx, tokens, notifTitle, notifBody,
+		map[string]string{"type": "playlist_invite", "invitation_id": fmt.Sprintf("%d", invitationID)},
+	); err != nil {
+		log.Printf("[notification] NotifyPlaylistInvite: Expo send failed: %v", err)
+	}
+}
+
+// NotifyInvitationAccepted notifies the inviter that their invitation was accepted.
+func (s *NotificationService) NotifyInvitationAccepted(playlistID int, playlistName, inviteeName string, inviterID int) {
+	if inviterID == 0 {
+		return
+	}
+	notifTitle := "✅ Invitation Accepted"
+	notifBody := inviteeName + " accepted your invitation to \"" + playlistName + "\""
+	data := fmt.Sprintf(`{"playlist_id":%d,"playlist_name":"%s"}`, playlistID, playlistName)
+	log.Printf("[notification] NotifyInvitationAccepted: saving inbox row for inviterID=%d", inviterID)
+	if err := s.repo.SaveNotification(inviterID, notifTitle, notifBody, "playlist_update", data); err != nil {
+		log.Printf("[notification] NotifyInvitationAccepted: SaveNotification failed: %v", err)
+	}
+	tokens, err := s.repo.GetTokensByUserIDs([]int{inviterID})
+	if err != nil {
+		log.Printf("[notification] NotifyInvitationAccepted: GetTokens failed: %v", err)
+		return
+	}
+	log.Printf("[notification] NotifyInvitationAccepted: sending Expo push to %d token(s) for inviterID=%d", len(tokens), inviterID)
+	ctx, cancel := pushCtx()
+	defer cancel()
+	if err := s.push.Send(ctx, tokens, notifTitle, notifBody,
+		map[string]string{"type": "playlist_update", "playlist": playlistName},
+	); err != nil {
+		log.Printf("[notification] NotifyInvitationAccepted: Expo send failed: %v", err)
 	}
 }
 
