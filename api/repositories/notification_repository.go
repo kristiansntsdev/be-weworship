@@ -107,21 +107,24 @@ func (r *NotificationRepository) SaveBroadcastNotification(title, message, group
 }
 
 // ListByUserID returns paginated notifications for a user (targeted + broadcasts), newest first.
+// Notifications older than 1 week are excluded.
 func (r *NotificationRepository) ListByUserID(userID, page, limit int) ([]NotificationRow, error) {
 	if page < 1 {
 		page = 1
 	}
 	offset := (page - 1) * limit
+	cutoff := time.Now().Add(-7 * 24 * time.Hour)
 	var rows []NotificationRow
 	err := r.db.Select(&rows, `
 		SELECT id, user_id, title, message, group_type,
 		       CASE WHEN user_id IS NULL THEN TRUE ELSE is_read END AS is_read,
 		       COALESCE(data,'') AS data, "createdAt"
 		FROM notifications
-		WHERE user_id = $1 OR user_id IS NULL
+		WHERE (user_id = $1 OR user_id IS NULL)
+		  AND "createdAt" >= $4
 		ORDER BY "createdAt" DESC
 		LIMIT $2 OFFSET $3
-	`, userID, limit, offset)
+	`, userID, limit, offset, cutoff)
 	return rows, err
 }
 
@@ -131,10 +134,13 @@ func (r *NotificationRepository) MarkRead(id, userID int) error {
 	return err
 }
 
-// CountUnread returns the number of unread targeted notifications for a user.
-// Broadcast rows are excluded — they never count toward the unread badge.
+// CountUnread returns the number of unread targeted notifications for a user within the past week.
+// Broadcast rows and notifications older than 1 week are excluded — they never count toward the unread badge.
 func (r *NotificationRepository) CountUnread(userID int) (int, error) {
 	var count int
-	err := r.db.Get(&count, `SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE`, userID)
+	err := r.db.Get(&count,
+		`SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE AND "createdAt" >= $2`,
+		userID, time.Now().Add(-7*24*time.Hour),
+	)
 	return count, err
 }
