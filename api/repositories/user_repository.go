@@ -19,7 +19,7 @@ func (r *UserRepository) Count(search string) (int, error) {
 	where := `WHERE 1=1`
 	args := []any{}
 	if search != "" {
-		where += ` AND (email LIKE ? OR username LIKE ?)`
+		where += ` AND (LOWER(email) LIKE LOWER(?) OR LOWER(username) LIKE LOWER(?))`
 		like := "%" + search + "%"
 		args = append(args, like, like)
 	}
@@ -33,7 +33,7 @@ func (r *UserRepository) List(search string, page, limit int) ([]models.User, er
 	where := `WHERE 1=1`
 	args := []any{}
 	if search != "" {
-		where += ` AND (email LIKE ? OR username LIKE ?)`
+		where += ` AND (LOWER(email) LIKE LOWER(?) OR LOWER(username) LIKE LOWER(?))`
 		like := "%" + search + "%"
 		args = append(args, like, like)
 	}

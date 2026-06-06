@@ -32,7 +32,8 @@ func NewInvitationService(
 // SearchUsers returns up to 10 users whose username or email contains the query,
 // excluding the requesting user. Returns empty slice for queries shorter than 2 chars.
 func (s *InvitationService) SearchUsers(query string, requestingUserID int) ([]models.UserBasic, error) {
-	if len(strings.TrimSpace(query)) < 2 {
+	query = normalizeInviteUserSearch(query)
+	if len(query) < 2 {
 		return []models.UserBasic{}, nil
 	}
 	users, err := s.users.List(query, 1, 10)
@@ -47,6 +48,14 @@ func (s *InvitationService) SearchUsers(query string, requestingUserID int) ([]m
 		out = append(out, models.UserBasic{ID: u.ID, Username: u.Username, Email: u.Email})
 	}
 	return out, nil
+}
+
+func normalizeInviteUserSearch(query string) string {
+	query = strings.TrimSpace(query)
+	if strings.HasPrefix(strings.ToLower(query), "ww@") {
+		query = query[3:]
+	}
+	return strings.TrimSpace(query)
 }
 
 // SendInvitation creates a pending invitation from inviterID to inviteeID on the playlist.
