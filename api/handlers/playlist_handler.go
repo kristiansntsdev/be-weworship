@@ -165,6 +165,28 @@ func (h *Handler) AddSongToPlaylistWithBaseChord(c *fiber.Ctx) error {
 	return utils.OK(c, 200, "Song added to playlist with base chord successfully", fiber.Map{"playlist_id": id, "song_id": songID, "base_chord": req.BaseChord})
 }
 
+func (h *Handler) UpdatePlaylistSongKey(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	songID, err := parseID(c, "songId")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid song ID")
+	}
+	var req struct {
+		BaseChord string `json:"base_chord"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	status, err := h.playlists.UpdateSongKey(id, cl.UserID, songID, req.BaseChord)
+	if err != nil {
+		return utils.Fail(c, status, err.Error())
+	}
+	return utils.OK(c, 200, "Playlist song key updated", fiber.Map{"playlist_id": id, "song_id": songID, "base_chord": req.BaseChord})
+}
 
 func (h *Handler) ReorderPlaylistSongs(c *fiber.Ctx) error {
 	cl := middleware.GetClaims(c)
@@ -215,46 +237,46 @@ func (h *Handler) RemoveSongFromPlaylist(c *fiber.Ctx) error {
 // ── Live Session handlers ─────────────────────────────────────────────────────
 
 func (h *Handler) StartLiveSession(c *fiber.Ctx) error {
-cl := middleware.GetClaims(c)
-id, err := parseID(c, "id")
-if err != nil {
-return utils.Fail(c, 400, "Invalid playlist ID")
-}
-if err := h.playlists.StartLive(id, cl.UserID); err != nil {
-return utils.Fail(c, 403, err.Error())
-}
-return utils.OK(c, 200, "Live session started", fiber.Map{"playlist_id": id})
+	cl := middleware.GetClaims(c)
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	if err := h.playlists.StartLive(id, cl.UserID); err != nil {
+		return utils.Fail(c, 403, err.Error())
+	}
+	return utils.OK(c, 200, "Live session started", fiber.Map{"playlist_id": id})
 }
 
 func (h *Handler) EndLiveSession(c *fiber.Ctx) error {
-cl := middleware.GetClaims(c)
-id, err := parseID(c, "id")
-if err != nil {
-return utils.Fail(c, 400, "Invalid playlist ID")
-}
-if err := h.playlists.EndLive(id, cl.UserID); err != nil {
-return utils.Fail(c, 403, err.Error())
-}
-return utils.OK(c, 200, "Live session ended", fiber.Map{"playlist_id": id})
+	cl := middleware.GetClaims(c)
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	if err := h.playlists.EndLive(id, cl.UserID); err != nil {
+		return utils.Fail(c, 403, err.Error())
+	}
+	return utils.OK(c, 200, "Live session ended", fiber.Map{"playlist_id": id})
 }
 
 func (h *Handler) UpdateLiveState(c *fiber.Ctx) error {
-cl := middleware.GetClaims(c)
-id, err := parseID(c, "id")
-if err != nil {
-return utils.Fail(c, 400, "Invalid playlist ID")
-}
-var req struct {
-SongIndex   int     `json:"song_index"`
-ScrollRatio float64 `json:"scroll_ratio"`
-}
-if err := c.BodyParser(&req); err != nil {
-return utils.Fail(c, 400, "Invalid JSON")
-}
-if err := h.playlists.UpdateLiveState(id, cl.UserID, req.SongIndex, req.ScrollRatio); err != nil {
-return utils.Fail(c, 403, err.Error())
-}
-return utils.OK(c, 200, "State updated", fiber.Map{"song_index": req.SongIndex, "scroll_ratio": req.ScrollRatio})
+	cl := middleware.GetClaims(c)
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	var req struct {
+		SongIndex   int     `json:"song_index"`
+		ScrollRatio float64 `json:"scroll_ratio"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	if err := h.playlists.UpdateLiveState(id, cl.UserID, req.SongIndex, req.ScrollRatio); err != nil {
+		return utils.Fail(c, 403, err.Error())
+	}
+	return utils.OK(c, 200, "State updated", fiber.Map{"song_index": req.SongIndex, "scroll_ratio": req.ScrollRatio})
 }
 
 func (h *Handler) GetLiveState(c *fiber.Ctx) error {

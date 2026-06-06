@@ -216,11 +216,42 @@ func (s *PlaylistService) AddSongWithBaseChord(playlistID, userID, songID int, b
 	if strings.TrimSpace(baseChord) == "" {
 		return 400, fmt.Errorf("base_chord is required")
 	}
-	status, err := s.AddSongs(playlistID, userID, []int{songID})
+	ok, err := s.canUseMdTools(playlistID, userID)
 	if err != nil {
-		return status, err
+		return 500, err
+	}
+	if !ok {
+		return 403, fmt.Errorf("access denied")
+	}
+	if err := s.appendSongs(playlistID, []int{songID}); err != nil {
+		return 500, err
 	}
 	if err := s.playlists.SetSongKey(playlistID, songID, strings.TrimSpace(baseChord)); err != nil {
+		return 500, err
+	}
+	return 200, nil
+}
+
+func (s *PlaylistService) UpdateSongKey(playlistID, userID, songID int, baseChord string) (int, error) {
+	baseChord = strings.TrimSpace(baseChord)
+	if baseChord == "" {
+		return 400, fmt.Errorf("base_chord is required")
+	}
+	ok, err := s.canUseMdTools(playlistID, userID)
+	if err != nil {
+		return 500, err
+	}
+	if !ok {
+		return 403, fmt.Errorf("access denied")
+	}
+	pl, err := s.playlists.GetByID(playlistID)
+	if err != nil || pl == nil {
+		return 404, fmt.Errorf("playlist not found")
+	}
+	if !utils.ContainsInt(utils.ParseIntSlice(pl.SongsRaw.String), songID) {
+		return 404, fmt.Errorf("song is not in this playlist")
+	}
+	if err := s.playlists.SetSongKey(playlistID, songID, baseChord); err != nil {
 		return 500, err
 	}
 	return 200, nil
@@ -343,7 +374,7 @@ func (s *PlaylistService) StartLive(playlistID, userID int) error {
 	if s.live == nil {
 		return fmt.Errorf("live sessions unavailable")
 	}
-	ok, err := s.playlists.CanManage(playlistID, userID)
+	ok, err := s.canBroadcastLive(playlistID, userID)
 	if err != nil || !ok {
 		return fmt.Errorf("access denied")
 	}
@@ -354,7 +385,7 @@ func (s *PlaylistService) EndLive(playlistID, userID int) error {
 	if s.live == nil {
 		return nil
 	}
-	ok, err := s.playlists.CanManage(playlistID, userID)
+	ok, err := s.canBroadcastLive(playlistID, userID)
 	if err != nil || !ok {
 		return fmt.Errorf("access denied")
 	}
@@ -365,7 +396,7 @@ func (s *PlaylistService) UpdateLiveState(playlistID, userID, songIndex int, scr
 	if s.live == nil {
 		return fmt.Errorf("live sessions unavailable")
 	}
-	ok, err := s.playlists.CanManage(playlistID, userID)
+	ok, err := s.canBroadcastLive(playlistID, userID)
 	if err != nil || !ok {
 		return fmt.Errorf("access denied")
 	}
@@ -390,6 +421,39 @@ func (s *PlaylistService) GetViewerRole(playlistID, userID int) string {
 		return "guest"
 	}
 	return m.Role
+}
+
+func (s *PlaylistService) canBroadcastLive(playlistID, userID int) (bool, error) {
+	if userID == 0 {
+		return false, nil
+	}
+	pl, err := s.playlists.GetByID(playlistID)
+	if err != nil || pl == nil {
+		return false, err
+	}
+	if pl.UserID == userID {
+		return true, nil
+	}
+	team, err := s.teams.FindByPlaylistID(playlistID)
+	if err != nil || team == nil {
+		return false, err
+	}
+	if team.LeadID == userID || utils.ContainsInt(utils.ParseIntSlice(team.CoLeadsRaw.String), userID) {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (s *PlaylistService) canUseMdTools(playlistID, userID int) (bool, error) {
+	ok, err := s.canBroadcastLive(playlistID, userID)
+	if err != nil || ok {
+		return ok, err
+	}
+	member, err := s.teams.GetMember(playlistID, userID)
+	if err != nil {
+		return false, err
+	}
+	return member != nil && member.Role == "md", nil
 }
 
 func (s *PlaylistService) GetPreview(shareToken string) (map[string]any, int, error) {
@@ -441,4 +505,3 @@ func (s *PlaylistService) GetOwnerByTeamID(teamID int) (ownerID int, playlistNam
 	}
 	return pl.UserID, pl.PlaylistName, nil
 }
-

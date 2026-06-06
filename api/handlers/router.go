@@ -1,13 +1,13 @@
 package handlers
 
 import (
-"fmt"
-"strconv"
+	"fmt"
+	"strconv"
 
-"be-songbanks-v1/api/middleware"
-"be-songbanks-v1/api/services"
-"be-songbanks-v1/api/utils"
-"github.com/gofiber/fiber/v2"
+	"be-songbanks-v1/api/middleware"
+	"be-songbanks-v1/api/services"
+	"be-songbanks-v1/api/utils"
+	"github.com/gofiber/fiber/v2"
 )
 
 type Handler struct {
@@ -29,43 +29,43 @@ func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, s
 }
 
 func (h *Handler) Register(app *fiber.App) {
-app.Get("/", func(c *fiber.Ctx) error {
-return utils.OK(c, 200, "Welcome to WeWorship API", fiber.Map{"version": "3.0.0"})
-})
+	app.Get("/", func(c *fiber.Ctx) error {
+		return utils.OK(c, 200, "Welcome to WeWorship API", fiber.Map{"version": "3.0.0"})
+	})
 
-api := app.Group("/api")
-ra := h.authMW.RequireAuth
+	api := app.Group("/api")
+	ra := h.authMW.RequireAuth
 
-// ── Public routes ──────────────────────────────────────────────────────
-api.Post("/auth/register", h.RegisterUser)
-api.Post("/auth/login", h.Login)
-api.Get("/auth/google", h.GoogleLogin)
-api.Get("/auth/google/callback", h.GoogleCallback)
-api.Post("/account/deletion-request", h.RequestAccountDeletion)
-api.Get("/home", h.GetHome)
-api.Get("/artists", h.GetArtists)
-api.Get("/songs", h.GetSongs)
-api.Get("/songs/export", ra, h.GetSongsExport)
-api.Get("/songs/:id", h.GetSongByID)
-api.Post("/song-requests", ra, h.RequestSong)
-api.Get("/song-requests", ra, h.GetMySongRequests)
-api.Delete("/song-requests/:id", ra, h.DeleteSongRequest)
-api.Get("/tags", h.GetTags)
-api.Post("/tags/get-or-create", h.GetOrCreateTag)
+	// ── Public routes ──────────────────────────────────────────────────────
+	api.Post("/auth/register", h.RegisterUser)
+	api.Post("/auth/login", h.Login)
+	api.Get("/auth/google", h.GoogleLogin)
+	api.Get("/auth/google/callback", h.GoogleCallback)
+	api.Post("/account/deletion-request", h.RequestAccountDeletion)
+	api.Get("/home", h.GetHome)
+	api.Get("/artists", h.GetArtists)
+	api.Get("/songs", h.GetSongs)
+	api.Get("/songs/export", ra, h.GetSongsExport)
+	api.Get("/songs/:id", h.GetSongByID)
+	api.Post("/song-requests", ra, h.RequestSong)
+	api.Get("/song-requests", ra, h.GetMySongRequests)
+	api.Delete("/song-requests/:id", ra, h.DeleteSongRequest)
+	api.Get("/tags", h.GetTags)
+	api.Post("/tags/get-or-create", h.GetOrCreateTag)
 
-// ── Analytics write (optionally authenticated) ─────────────────────────
-api.Post("/analytics/performance", h.RecordPerformance)
-api.Post("/analytics/session", h.RecordSession)
+	// ── Analytics write (optionally authenticated) ─────────────────────────
+	api.Post("/analytics/performance", h.RecordPerformance)
+	api.Post("/analytics/session", h.RecordSession)
 
-// ── Auth-required routes ───────────────────────────────────────────────
-// NOTE: Do NOT use api.Group("", middleware) — in Fiber v2, an empty-prefix
-// group registers the middleware as a global Use() on all /api/* routes,
-// including public ones. Apply middleware inline per route instead.
+	// ── Auth-required routes ───────────────────────────────────────────────
+	// NOTE: Do NOT use api.Group("", middleware) — in Fiber v2, an empty-prefix
+	// group registers the middleware as a global Use() on all /api/* routes,
+	// including public ones. Apply middleware inline per route instead.
 
-api.Post("/auth/logout", ra, func(c *fiber.Ctx) error { return utils.OK(c, 200, "Logout successful", nil) })
-api.Get("/auth/me", ra, h.GetMe)
-api.Get("/auth/check-permission", ra, h.CheckPermission)
-api.Put("/profile", ra, h.UpdateProfile)
+	api.Post("/auth/logout", ra, func(c *fiber.Ctx) error { return utils.OK(c, 200, "Logout successful", nil) })
+	api.Get("/auth/me", ra, h.GetMe)
+	api.Get("/auth/check-permission", ra, h.CheckPermission)
+	api.Put("/profile", ra, h.UpdateProfile)
 	api.Put("/profile/avatar", ra, h.UpdateAvatar)
 
 	// ── Push notifications ─────────────────────────────────────────────────────
@@ -81,20 +81,21 @@ api.Put("/profile", ra, h.UpdateProfile)
 
 	// ── Playlist invitations ──────────────────────────────────────────────────
 	api.Post("/playlists/:id/invitations", ra, h.SendInvitation)
-	api.Post("/invitations/:id/accept",    ra, h.AcceptInvitation)
-	api.Post("/invitations/:id/decline",   ra, h.DeclineInvitation)
+	api.Post("/invitations/:id/accept", ra, h.AcceptInvitation)
+	api.Post("/invitations/:id/decline", ra, h.DeclineInvitation)
 
-api.Post("/playlists", ra, h.CreatePlaylist)
-api.Get("/playlists", ra, h.GetPlaylists)
-api.Get("/playlists/:id", ra, h.GetPlaylistByID)
-api.Put("/playlists/:id", ra, h.UpdatePlaylist)
-api.Delete("/playlists/:id", ra, h.DeletePlaylist)
-api.Post("/playlists/:id/sharelink", ra, h.GenerateSharelink)
-api.Get("/playlists/preview/:shareToken", h.GetPlaylistPreview)
-api.Post("/playlists/join/:shareToken", ra, h.JoinPlaylist)
-api.Post("/playlists/:id/songs", ra, h.AddSongsToPlaylist)
-api.Post("/playlists/:id/songs/:songId", ra, h.AddSongToPlaylistWithBaseChord)
-api.Put("/playlists/:id/reorder", ra, h.ReorderPlaylistSongs)
+	api.Post("/playlists", ra, h.CreatePlaylist)
+	api.Get("/playlists", ra, h.GetPlaylists)
+	api.Get("/playlists/:id", ra, h.GetPlaylistByID)
+	api.Put("/playlists/:id", ra, h.UpdatePlaylist)
+	api.Delete("/playlists/:id", ra, h.DeletePlaylist)
+	api.Post("/playlists/:id/sharelink", ra, h.GenerateSharelink)
+	api.Get("/playlists/preview/:shareToken", h.GetPlaylistPreview)
+	api.Post("/playlists/join/:shareToken", ra, h.JoinPlaylist)
+	api.Post("/playlists/:id/songs", ra, h.AddSongsToPlaylist)
+	api.Post("/playlists/:id/songs/:songId", ra, h.AddSongToPlaylistWithBaseChord)
+	api.Put("/playlists/:id/songs/:songId/key", ra, h.UpdatePlaylistSongKey)
+	api.Put("/playlists/:id/reorder", ra, h.ReorderPlaylistSongs)
 	api.Delete("/playlists/:id/song/:songId", ra, h.RemoveSongFromPlaylist)
 	// Live session (GET uses OptionalAuth — decode role if token present, guest otherwise)
 	api.Post("/playlists/:id/live", ra, h.StartLiveSession)
@@ -106,50 +107,50 @@ api.Put("/playlists/:id/reorder", ra, h.ReorderPlaylistSongs)
 	api.Get("/playlists/:id/members", ra, h.GetPlaylistMembers)
 	api.Put("/playlists/:id/members/:userId/role", ra, h.SetPlaylistMemberRole)
 
-api.Get("/playlist-teams", ra, h.GetMyTeams)
-api.Get("/playlist-teams/:id", ra, h.GetTeamByID)
-api.Delete("/playlist-teams/:id/members/:user_id", ra, h.RemoveMember)
-api.Delete("/playlist-teams/:id", ra, h.DeleteTeam)
-api.Post("/playlist-teams/:id/leave", ra, h.LeaveTeam)
-api.Post("/playlist-teams/:id/co-leads", ra, h.PromoteCoLead)
-api.Delete("/playlist-teams/:id/co-leads/:user_id", ra, h.DemoteCoLead)
+	api.Get("/playlist-teams", ra, h.GetMyTeams)
+	api.Get("/playlist-teams/:id", ra, h.GetTeamByID)
+	api.Delete("/playlist-teams/:id/members/:user_id", ra, h.RemoveMember)
+	api.Delete("/playlist-teams/:id", ra, h.DeleteTeam)
+	api.Post("/playlist-teams/:id/leave", ra, h.LeaveTeam)
+	api.Post("/playlist-teams/:id/co-leads", ra, h.PromoteCoLead)
+	api.Delete("/playlist-teams/:id/co-leads/:user_id", ra, h.DemoteCoLead)
 
-// ── Admin routes ───────────────────────────────────────────────────────
-// Song CRUD: accessible by admin or maintainer
-rm := h.authMW.RequireMaintainer
-api.Post("/admin/songs", ra, rm, h.CreateSong)
-api.Put("/admin/songs/:id", ra, rm, h.UpdateSong)
-api.Delete("/admin/songs/:id", ra, rm, h.DeleteSong)
+	// ── Admin routes ───────────────────────────────────────────────────────
+	// Song CRUD: accessible by admin or maintainer
+	rm := h.authMW.RequireMaintainer
+	api.Post("/admin/songs", ra, rm, h.CreateSong)
+	api.Put("/admin/songs/:id", ra, rm, h.UpdateSong)
+	api.Delete("/admin/songs/:id", ra, rm, h.DeleteSong)
 
-// Song requests: accessible by admin and maintainer (MUST be before admin group!)
-api.Get("/admin/song-requests", ra, rm, h.GetSongRequests)
-api.Put("/admin/song-requests/:id", ra, rm, h.UpdateSongRequest)
-api.Get("/admin/fcm-status", ra, rm, h.GetFCMStatus)
+	// Song requests: accessible by admin and maintainer (MUST be before admin group!)
+	api.Get("/admin/song-requests", ra, rm, h.GetSongRequests)
+	api.Put("/admin/song-requests/:id", ra, rm, h.UpdateSongRequest)
+	api.Get("/admin/fcm-status", ra, rm, h.GetFCMStatus)
 
-admin := api.Group("/admin", ra, h.authMW.RequireAdmin)
-admin.Get("/users", h.GetUsers)
+	admin := api.Group("/admin", ra, h.authMW.RequireAdmin)
+	admin.Get("/users", h.GetUsers)
 
-// Analytics (admin read)
-admin.Get("/analytics/songs", h.GetAnalyticsSongs)
-admin.Get("/analytics/users", h.GetAnalyticsUsers)
-admin.Get("/analytics/searches", h.GetAnalyticsSearches)
-admin.Get("/analytics/sessions", h.GetAnalyticsSessions)
-admin.Get("/analytics/performance", h.GetAnalyticsPerformance)
+	// Analytics (admin read)
+	admin.Get("/analytics/songs", h.GetAnalyticsSongs)
+	admin.Get("/analytics/users", h.GetAnalyticsUsers)
+	admin.Get("/analytics/searches", h.GetAnalyticsSearches)
+	admin.Get("/analytics/sessions", h.GetAnalyticsSessions)
+	admin.Get("/analytics/performance", h.GetAnalyticsPerformance)
 
-// Audit log
-admin.Get("/audit-logs", h.GetAuditLogs)
+	// Audit log
+	admin.Get("/audit-logs", h.GetAuditLogs)
 
-app.Use(func(c *fiber.Ctx) error {
-return utils.Fail(c, 404, fmt.Sprintf("Route %s %s not found", c.Method(), c.OriginalURL()))
-})
+	app.Use(func(c *fiber.Ctx) error {
+		return utils.Fail(c, 404, fmt.Sprintf("Route %s %s not found", c.Method(), c.OriginalURL()))
+	})
 }
 
 func parseID(c *fiber.Ctx, key string) (int, error) {
-v, err := strconv.Atoi(c.Params(key))
-if err != nil {
-return 0, fmt.Errorf("invalid %s", key)
-}
-return v, nil
+	v, err := strconv.Atoi(c.Params(key))
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s", key)
+	}
+	return v, nil
 }
 
 // filterOutUserID returns a new slice with the given userID removed.
@@ -164,5 +165,5 @@ func filterOutUserID(ids []int, exclude int) []int {
 }
 
 func parseInt(s string) (int, error) {
-return strconv.Atoi(s)
+	return strconv.Atoi(s)
 }
