@@ -19,8 +19,8 @@ func (r *UserRepository) Count(search string) (int, error) {
 	where := `WHERE 1=1`
 	args := []any{}
 	if search != "" {
-		where += ` AND (LOWER(email) LIKE LOWER(?) OR LOWER(username) LIKE LOWER(?))`
-		like := "%" + search + "%"
+		where += ` AND (email ILIKE ? ESCAPE '\' OR username ILIKE ? ESCAPE '\')`
+		like := containsPattern(search)
 		args = append(args, like, like)
 	}
 	var total int
@@ -33,8 +33,8 @@ func (r *UserRepository) List(search string, page, limit int) ([]models.User, er
 	where := `WHERE 1=1`
 	args := []any{}
 	if search != "" {
-		where += ` AND (LOWER(email) LIKE LOWER(?) OR LOWER(username) LIKE LOWER(?))`
-		like := "%" + search + "%"
+		where += ` AND (email ILIKE ? ESCAPE '\' OR username ILIKE ? ESCAPE '\')`
+		like := containsPattern(search)
 		args = append(args, like, like)
 	}
 	query := r.db.Rebind(`SELECT id,username,email,avatar_url,role,provider,verified,status,"createdAt","updatedAt" FROM users ` + where + ` ORDER BY id DESC LIMIT ? OFFSET ?`)

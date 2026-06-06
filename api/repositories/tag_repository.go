@@ -21,8 +21,8 @@ func (r *TagRepository) List(search string) ([]models.Tag, error) {
 	query := `SELECT id,name,description FROM tags`
 	args := []any{}
 	if search != "" {
-		query += ` WHERE name LIKE ? OR description LIKE ?`
-		like := "%" + search + "%"
+		query += ` WHERE name ILIKE ? ESCAPE '\' OR description ILIKE ? ESCAPE '\'`
+		like := containsPattern(search)
 		args = append(args, like, like)
 	}
 	query = r.db.Rebind(query + ` ORDER BY name ASC`)

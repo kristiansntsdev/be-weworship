@@ -28,23 +28,23 @@ func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOr
 		words := strings.Fields(strings.TrimSpace(search))
 		if len(words) == 1 {
 			// Single word: search in title, artist, or plain_lyrics
-			where = append(where, `(s.title ILIKE ? OR s.artist ILIKE ? OR COALESCE(s.plain_lyrics, s.lyrics_and_chords) ILIKE ?)`)
-			like := "%" + words[0] + "%"
+			where = append(where, `(s.title ILIKE ? ESCAPE '\' OR s.artist ILIKE ? ESCAPE '\' OR COALESCE(s.plain_lyrics, s.lyrics_and_chords) ILIKE ? ESCAPE '\')`)
+			like := containsPattern(words[0])
 			args = append(args, like, like, like)
 		} else {
 			// Multiple words: each word must appear somewhere in title, artist, or lyrics
 			wordConditions := make([]string, len(words))
 			for i, word := range words {
-				wordConditions[i] = `(s.title ILIKE ? OR s.artist ILIKE ? OR COALESCE(s.plain_lyrics, s.lyrics_and_chords) ILIKE ?)`
-				like := "%" + word + "%"
+				wordConditions[i] = `(s.title ILIKE ? ESCAPE '\' OR s.artist ILIKE ? ESCAPE '\' OR COALESCE(s.plain_lyrics, s.lyrics_and_chords) ILIKE ? ESCAPE '\')`
+				like := containsPattern(word)
 				args = append(args, like, like, like)
 			}
 			where = append(where, "("+strings.Join(wordConditions, " AND ")+")")
 		}
 	}
 	if strings.TrimSpace(baseChord) != "" {
-		where = append(where, `s.base_chord ILIKE ?`)
-		args = append(args, "%"+strings.TrimSpace(baseChord)+"%")
+		where = append(where, `s.base_chord ILIKE ? ESCAPE '\'`)
+		args = append(args, containsPattern(baseChord))
 	}
 	if len(tagIDs) > 0 {
 		ph := strings.TrimRight(strings.Repeat("?,", len(tagIDs)), ",")
