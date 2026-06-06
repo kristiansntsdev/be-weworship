@@ -204,17 +204,18 @@ func (s *TeamService) ListMembers(playlistID int) ([]map[string]any, int, error)
 	out := make([]map[string]any, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, map[string]any{
-			"user_id": r.UserID,
+			"user_id":  r.UserID,
 			"username": r.Username,
-			"email":   r.Email,
-			"role":    r.Role,
+			"email":    r.Email,
+			"role":     r.Role,
 		})
 	}
 	return out, 200, nil
 }
 
 // SetMemberRole sets (or updates) the role for a member in a playlist.
-// Only the team lead or an existing MD may assign roles.
+// The team lead or an existing MD may assign roles.
+// Members may assign their own role.
 // Business rules:
 //   - role must be one of: singer, musician, md
 //   - max 1 MD per playlist; promote request is rejected if another MD already exists
@@ -236,15 +237,16 @@ func (s *TeamService) SetMemberRole(playlistID, requesterID, targetUserID int, r
 		return 404, fmt.Errorf("playlist team not found")
 	}
 
-	// Determine if requester is authorised (lead OR current MD)
+	// Determine if requester is authorised (lead, current MD, or self-assignment)
 	requesterMember, err := s.teams.GetMember(playlistID, requesterID)
 	if err != nil {
 		return 500, err
 	}
 	isLead := team.LeadID == requesterID
 	isMD := requesterMember != nil && requesterMember.Role == "md"
-	if !isLead && !isMD {
-		return 403, fmt.Errorf("access denied: only the team lead or an MD can set member roles")
+	isSelf := requesterID == targetUserID
+	if !isLead && !isMD && !isSelf {
+		return 403, fmt.Errorf("access denied: only the team lead, an MD, or the member themselves can set member roles")
 	}
 
 	// Verify target user is a member of this playlist

@@ -253,6 +253,31 @@ func TestTeamService_SetMemberRole_NotAuthorised(t *testing.T) {
 	assert.Equal(t, 403, status)
 }
 
+func TestTeamService_SetMemberRole_Success_Self(t *testing.T) {
+	upsertCalled := false
+	mockTeams := &mocks.TeamRepo{
+		FindByPlaylistIDFn: func(int) (*models.PlaylistTeam, error) {
+			return makeTeam(1, 10, 5 /*lead*/, []int{5, 7}, nil), nil
+		},
+		GetMemberFn: func(playlistID, userID int) (*models.PlaylistMember, error) {
+			return &models.PlaylistMember{PlaylistID: playlistID, UserID: userID, Role: "singer"}, nil
+		},
+		UpsertMemberFn: func(playlistID, userID int, role string) error {
+			assert.Equal(t, 10, playlistID)
+			assert.Equal(t, 7, userID)
+			assert.Equal(t, "musician", role)
+			upsertCalled = true
+			return nil
+		},
+	}
+	svc := &TeamService{teams: mockTeams, users: &mocks.AuthRepo{}, playlists: &mocks.PlaylistRepo{}}
+	status, err := svc.SetMemberRole(10, 7, 7, "musician")
+
+	require.NoError(t, err)
+	assert.Equal(t, 200, status)
+	assert.True(t, upsertCalled)
+}
+
 func TestTeamService_SetMemberRole_MaxMD(t *testing.T) {
 	callCount := 0
 	mockTeams := &mocks.TeamRepo{
@@ -270,6 +295,27 @@ func TestTeamService_SetMemberRole_MaxMD(t *testing.T) {
 	svc := &TeamService{teams: mockTeams, users: &mocks.AuthRepo{}, playlists: &mocks.PlaylistRepo{}}
 	// Lead (5) tries to assign md to member (7), but another MD already exists
 	status, err := svc.SetMemberRole(10, 5 /*lead*/, 7, "md")
+
+	assert.Error(t, err)
+	assert.Equal(t, 409, status)
+}
+
+func TestTeamService_SetMemberRole_SelfMaxMD(t *testing.T) {
+	mockTeams := &mocks.TeamRepo{
+		FindByPlaylistIDFn: func(int) (*models.PlaylistTeam, error) {
+			return makeTeam(1, 10, 5 /*lead*/, []int{5, 7}, nil), nil
+		},
+		GetMemberFn: func(playlistID, userID int) (*models.PlaylistMember, error) {
+			return &models.PlaylistMember{PlaylistID: playlistID, UserID: userID, Role: "singer"}, nil
+		},
+		CountByRoleFn: func(playlistID int, role string) (int, error) {
+			assert.Equal(t, 10, playlistID)
+			assert.Equal(t, "md", role)
+			return 1, nil
+		},
+	}
+	svc := &TeamService{teams: mockTeams, users: &mocks.AuthRepo{}, playlists: &mocks.PlaylistRepo{}}
+	status, err := svc.SetMemberRole(10, 7, 7, "md")
 
 	assert.Error(t, err)
 	assert.Equal(t, 409, status)
