@@ -304,12 +304,13 @@ func (h *Handler) GetLiveState(c *fiber.Ctx) error {
 		})
 	}
 	return utils.OK(c, 200, "Live state", fiber.Map{
-		"is_active":      state.IsActive,
-		"song_index":     state.SongIndex,
-		"scroll_ratio":   state.ScrollRatio,
-		"leader_user_id": state.LeaderUserID,
-		"updated_at":     state.UpdatedAt,
-		"viewer_role":    viewerRole,
+		"is_active":          state.IsActive,
+		"song_index":         state.SongIndex,
+		"scroll_ratio":       state.ScrollRatio,
+		"leader_user_id":     state.LeaderUserID,
+		"updated_at":         state.UpdatedAt,
+		"content_updated_at": state.ContentUpdatedAt,
+		"viewer_role":        viewerRole,
 	})
 }
 

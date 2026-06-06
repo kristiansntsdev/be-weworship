@@ -17,5 +17,6 @@ type LiveCacheIface interface {
 	StartSession(playlistID, leaderUserID int) error
 	EndSession(playlistID int) error
 	UpdateState(playlistID, songIndex int, scrollRatio float64) error
+	TouchContent(playlistID int) error
 	GetState(playlistID int) (*LiveState, error)
 }

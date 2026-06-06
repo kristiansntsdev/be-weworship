@@ -209,6 +209,7 @@ func (s *PlaylistService) AddSongs(playlistID, userID int, songIDs []int) (int, 
 	if err := s.appendSongs(playlistID, songIDs); err != nil {
 		return 500, err
 	}
+	s.touchLiveContent(playlistID)
 	return 200, nil
 }
 
@@ -229,6 +230,7 @@ func (s *PlaylistService) AddSongWithBaseChord(playlistID, userID, songID int, b
 	if err := s.playlists.SetSongKey(playlistID, songID, strings.TrimSpace(baseChord)); err != nil {
 		return 500, err
 	}
+	s.touchLiveContent(playlistID)
 	return 200, nil
 }
 
@@ -254,6 +256,7 @@ func (s *PlaylistService) UpdateSongKey(playlistID, userID, songID int, baseChor
 	if err := s.playlists.SetSongKey(playlistID, songID, baseChord); err != nil {
 		return 500, err
 	}
+	s.touchLiveContent(playlistID)
 	return 200, nil
 }
 
@@ -408,6 +411,13 @@ func (s *PlaylistService) GetLiveState(playlistID int) (*platform.LiveState, err
 		return nil, nil
 	}
 	return s.live.GetState(playlistID)
+}
+
+func (s *PlaylistService) touchLiveContent(playlistID int) {
+	if s.live == nil {
+		return
+	}
+	_ = s.live.TouchContent(playlistID)
 }
 
 // GetViewerRole returns the playlist role for a user (from playlist_members).

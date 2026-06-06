@@ -195,27 +195,27 @@ func (m *SongRepo) DeleteSongRequest(id, userID int) (bool, error) {
 // ── PlaylistRepo ──────────────────────────────────────────────────────────────
 
 type PlaylistRepo struct {
-	RecordShareEventFn        func(int)
+	RecordShareEventFn         func(int)
 	CountShareEventsThisWeekFn func() (int, error)
-	CountShareableFn          func() (int, error)
-	NameExistsForUserFn       func(int, string) (bool, error)
-	CreateFn                  func(int, string, []int) (int, error)
-	CountAccessibleFn         func(int) (int, error)
-	ListAccessibleFn          func(int, int, int) ([]models.PlaylistListRow, error)
-	GetByIDFn                 func(int) (*models.Playlist, error)
-	UpdateNameFn              func(int, int, string) (int64, error)
-	DeleteFn                  func(int, int) (int64, error)
-	UpdateShareFn             func(int, string, string, int64) error
-	FindByShareTokenFn        func(string) (int, int, sql.NullInt64, error)
-	GetPreviewByShareTokenFn  func(string) (*repositories.PlaylistPreview, error)
-	SetTeamIDFn               func(int, int64) error
-	ClearShareAndTeamFn       func(int) error
-	CanManageFn               func(int, int) (bool, error)
-	SetSongsFn                func(int, []int) error
-	ExistsAndOwnerFn          func(int) (int, error)
-	SetSongKeyFn              func(int, int, string) error
-	GetSongKeysFn             func(int) (map[int]string, error)
-	DeleteSongKeyFn           func(int, int) error
+	CountShareableFn           func() (int, error)
+	NameExistsForUserFn        func(int, string) (bool, error)
+	CreateFn                   func(int, string, []int) (int, error)
+	CountAccessibleFn          func(int) (int, error)
+	ListAccessibleFn           func(int, int, int) ([]models.PlaylistListRow, error)
+	GetByIDFn                  func(int) (*models.Playlist, error)
+	UpdateNameFn               func(int, int, string) (int64, error)
+	DeleteFn                   func(int, int) (int64, error)
+	UpdateShareFn              func(int, string, string, int64) error
+	FindByShareTokenFn         func(string) (int, int, sql.NullInt64, error)
+	GetPreviewByShareTokenFn   func(string) (*repositories.PlaylistPreview, error)
+	SetTeamIDFn                func(int, int64) error
+	ClearShareAndTeamFn        func(int) error
+	CanManageFn                func(int, int) (bool, error)
+	SetSongsFn                 func(int, []int) error
+	ExistsAndOwnerFn           func(int) (int, error)
+	SetSongKeyFn               func(int, int, string) error
+	GetSongKeysFn              func(int) (map[int]string, error)
+	DeleteSongKeyFn            func(int, int) error
 }
 
 func (m *PlaylistRepo) RecordShareEvent(playlistID int) {
@@ -430,9 +430,9 @@ func (m *TeamRepo) UpsertMember(playlistID, userID int, role string) error {
 // ── TagRepo ───────────────────────────────────────────────────────────────────
 
 type TagRepo struct {
-	ListFn         func(string) ([]models.Tag, error)
-	FindByNameFn   func(string) (*models.Tag, error)
-	CreateFn       func(string) (int, error)
+	ListFn           func(string) ([]models.Tag, error)
+	FindByNameFn     func(string) (*models.Tag, error)
+	CreateFn         func(string) (int, error)
 	GetTagsForSongFn func(int) ([]models.Tag, error)
 }
 
@@ -526,15 +526,15 @@ func (m *UserRepo) CreateDeletionRequest(email string, userID *int, ipAddress st
 // ── NotificationRepo ──────────────────────────────────────────────────────────
 
 type NotificationRepo struct {
-	UpsertDeviceTokenFn        func(int, string, string) error
-	DeleteDeviceTokenFn        func(int, string) error
-	GetTokensByUserIDsFn       func([]int) ([]string, error)
-	GetAllTokensFn             func() ([]string, error)
-	SaveNotificationFn         func(int, string, string, string, string) error
+	UpsertDeviceTokenFn         func(int, string, string) error
+	DeleteDeviceTokenFn         func(int, string) error
+	GetTokensByUserIDsFn        func([]int) ([]string, error)
+	GetAllTokensFn              func() ([]string, error)
+	SaveNotificationFn          func(int, string, string, string, string) error
 	SaveBroadcastNotificationFn func(string, string, string, string) error
-	ListByUserIDFn             func(int, int, int) ([]repositories.NotificationRow, error)
-	MarkReadFn                 func(int, int) error
-	CountUnreadFn              func(int) (int, error)
+	ListByUserIDFn              func(int, int, int) ([]repositories.NotificationRow, error)
+	MarkReadFn                  func(int, int) error
+	CountUnreadFn               func(int) (int, error)
 }
 
 func (m *NotificationRepo) UpsertDeviceToken(userID int, token, platform string) error {
@@ -707,11 +707,11 @@ func (m *AuditRepo) List(action, entityType string, userID *int, page, limit int
 // ── SongCache ─────────────────────────────────────────────────────────────────
 
 type SongCache struct {
-	EnabledFn            func() bool
-	GetFn                func(string, any) bool
-	SetFn                func(string, any)
+	EnabledFn             func() bool
+	GetFn                 func(string, any) bool
+	SetFn                 func(string, any)
 	InvalidateSongsListFn func()
-	InvalidateArtistsFn  func()
+	InvalidateArtistsFn   func()
 }
 
 func (m *SongCache) Enabled() bool {
@@ -749,6 +749,7 @@ type LiveCache struct {
 	StartSessionFn func(int, int) error
 	EndSessionFn   func(int) error
 	UpdateStateFn  func(int, int, float64) error
+	TouchContentFn func(int) error
 	GetStateFn     func(int) (*platform.LiveState, error)
 }
 
@@ -773,6 +774,12 @@ func (m *LiveCache) EndSession(playlistID int) error {
 func (m *LiveCache) UpdateState(playlistID, songIndex int, scrollRatio float64) error {
 	if m.UpdateStateFn != nil {
 		return m.UpdateStateFn(playlistID, songIndex, scrollRatio)
+	}
+	return nil
+}
+func (m *LiveCache) TouchContent(playlistID int) error {
+	if m.TouchContentFn != nil {
+		return m.TouchContentFn(playlistID)
 	}
 	return nil
 }

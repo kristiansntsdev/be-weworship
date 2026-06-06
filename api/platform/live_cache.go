@@ -11,11 +11,12 @@ import (
 )
 
 type LiveState struct {
-	SongIndex    int       `json:"song_index"`
-	ScrollRatio  float64   `json:"scroll_ratio"`
-	IsActive     bool      `json:"is_active"`
-	LeaderUserID int       `json:"leader_user_id"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	SongIndex        int        `json:"song_index"`
+	ScrollRatio      float64    `json:"scroll_ratio"`
+	IsActive         bool       `json:"is_active"`
+	LeaderUserID     int        `json:"leader_user_id"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	ContentUpdatedAt *time.Time `json:"content_updated_at,omitempty"`
 }
 
 type LiveCache struct {
@@ -54,12 +55,14 @@ func (c *LiveCache) StartSession(playlistID, leaderUserID int) error {
 	if !c.Enabled() {
 		return fmt.Errorf("live cache not available")
 	}
+	now := time.Now()
 	state := LiveState{
-		SongIndex:    0,
-		ScrollRatio:  0,
-		IsActive:     true,
-		LeaderUserID: leaderUserID,
-		UpdatedAt:    time.Now(),
+		SongIndex:        0,
+		ScrollRatio:      0,
+		IsActive:         true,
+		LeaderUserID:     leaderUserID,
+		UpdatedAt:        now,
+		ContentUpdatedAt: &now,
 	}
 	buf, err := json.Marshal(state)
 	if err != nil {
@@ -98,6 +101,26 @@ func (c *LiveCache) UpdateState(playlistID, songIndex int, scrollRatio float64) 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	// Reset TTL on each update
+	return c.client.Set(ctx, liveKey(playlistID), buf, c.ttl).Err()
+}
+
+func (c *LiveCache) TouchContent(playlistID int) error {
+	if !c.Enabled() {
+		return nil
+	}
+	existing, err := c.GetState(playlistID)
+	if err != nil || existing == nil {
+		return err
+	}
+	now := time.Now()
+	existing.UpdatedAt = now
+	existing.ContentUpdatedAt = &now
+	buf, err := json.Marshal(existing)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	return c.client.Set(ctx, liveKey(playlistID), buf, c.ttl).Err()
 }
 
