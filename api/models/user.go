@@ -31,7 +31,7 @@ type UserDetail struct {
 }
 
 type UserBasic struct {
-	ID       int    `db:"id"`
-	Username string `db:"username"`
-	Email    string `db:"email"`
+	ID       int    `db:"id" json:"id"`
+	Username string `db:"username" json:"username"`
+	Email    string `db:"email" json:"email"`
 }
