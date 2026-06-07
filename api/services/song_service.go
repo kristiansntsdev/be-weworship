@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -509,4 +510,92 @@ func (s *SongService) DeleteSongRequest(id, userID int) error {
 // GetSongRequestByID returns a song request by its ID.
 func (s *SongService) GetSongRequestByID(id int) (*models.SongRequest, bool, error) {
 	return s.songs.GetSongRequestByID(id)
+}
+
+// ── Song Reports ──────────────────────────────────────────────────────────────
+
+func (s *SongService) CreateSongReport(userID, songID int, reportType, description, evidenceURL string) (*models.SongReport, error) {
+	if songID < 1 {
+		return nil, fmt.Errorf("song_id is required")
+	}
+	exists, err := s.songs.ExistsByID(songID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, fmt.Errorf("song not found")
+	}
+
+	reportType = strings.TrimSpace(reportType)
+	validTypes := map[string]bool{"lyrics": true, "chord": true, "other": true}
+	if !validTypes[reportType] {
+		return nil, fmt.Errorf("invalid report_type: must be lyrics, chord, or other")
+	}
+
+	description = strings.TrimSpace(description)
+	if description == "" {
+		return nil, fmt.Errorf("description is required")
+	}
+
+	evidenceURL = strings.TrimSpace(evidenceURL)
+	if !isHTTPURL(evidenceURL) {
+		return nil, fmt.Errorf("evidence_url must be a valid http or https URL")
+	}
+
+	return s.songs.CreateSongReport(userID, songID, reportType, description, evidenceURL)
+}
+
+func isHTTPURL(raw string) bool {
+	u, err := url.ParseRequestURI(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return false
+	}
+	return u.Scheme == "http" || u.Scheme == "https"
+}
+
+func (s *SongService) ListSongReports(status string, page, limit int) ([]models.SongReport, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	return s.songs.ListSongReports(status, page, limit)
+}
+
+func (s *SongService) UpdateSongReportStatus(id int, status, adminNotes string) error {
+	validStatuses := map[string]bool{"pending": true, "approved": true, "rejected": true}
+	if !validStatuses[status] {
+		return fmt.Errorf("invalid status: must be pending, approved, or rejected")
+	}
+	return s.songs.UpdateSongReportStatus(id, status, adminNotes)
+}
+
+func (s *SongService) ListMySongReports(userID, page, limit int) ([]models.SongReport, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	return s.songs.ListUserSongReports(userID, page, limit)
+}
+
+func (s *SongService) DeleteSongReport(id, userID int) error {
+	report, found, err := s.songs.GetSongReportByID(id)
+	if err != nil {
+		return fmt.Errorf("internal error")
+	}
+	if !found {
+		return fmt.Errorf("not found")
+	}
+	if report.UserID != userID {
+		return fmt.Errorf("forbidden")
+	}
+	_, err = s.songs.DeleteSongReport(id, userID)
+	return err
+}
+
+func (s *SongService) GetSongReportByID(id int) (*models.SongReport, bool, error) {
+	return s.songs.GetSongReportByID(id)
 }

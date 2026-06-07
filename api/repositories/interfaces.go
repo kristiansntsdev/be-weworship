@@ -38,6 +38,12 @@ type SongRepoIface interface {
 	GetSongRequestByID(id int) (*models.SongRequest, bool, error)
 	ListUserSongRequests(userID, page, limit int) ([]models.SongRequest, int, error)
 	DeleteSongRequest(id, userID int) (bool, error)
+	CreateSongReport(userID, songID int, reportType, description, evidenceURL string) (*models.SongReport, error)
+	ListSongReports(status string, page, limit int) ([]models.SongReport, int, error)
+	UpdateSongReportStatus(id int, status, adminNotes string) error
+	GetSongReportByID(id int) (*models.SongReport, bool, error)
+	ListUserSongReports(userID, page, limit int) ([]models.SongReport, int, error)
+	DeleteSongReport(id, userID int) (bool, error)
 }
 
 // PlaylistRepoIface abstracts PlaylistRepository for testing.

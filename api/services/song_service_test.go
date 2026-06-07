@@ -248,3 +248,120 @@ func TestSongService_UpdateSongRequestStatus_AllValidStatuses(t *testing.T) {
 		assert.NoError(t, err, "status %q must be accepted", status)
 	}
 }
+
+// ── Song Reports ──────────────────────────────────────────────────────────────
+
+func TestSongService_CreateSongReport_Success(t *testing.T) {
+	mockSongs := &mocks.SongRepo{
+		ExistsByIDFn: func(id int) (bool, error) {
+			assert.Equal(t, 10, id)
+			return true, nil
+		},
+		CreateSongReportFn: func(userID, songID int, reportType, description, evidenceURL string) (*models.SongReport, error) {
+			return &models.SongReport{
+				ID:          1,
+				UserID:      userID,
+				SongID:      songID,
+				SongTitle:   "Amazing Grace",
+				ReportType:  reportType,
+				Description: description,
+				EvidenceURL: evidenceURL,
+				Status:      "pending",
+			}, nil
+		},
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+
+	report, err := svc.CreateSongReport(5, 10, "lyrics", "Verse two has incorrect lyrics", "https://example.com/proof")
+
+	require.NoError(t, err)
+	assert.Equal(t, 5, report.UserID)
+	assert.Equal(t, 10, report.SongID)
+	assert.Equal(t, "lyrics", report.ReportType)
+	assert.Equal(t, "https://example.com/proof", report.EvidenceURL)
+}
+
+func TestSongService_CreateSongReport_MissingSong(t *testing.T) {
+	mockSongs := &mocks.SongRepo{
+		ExistsByIDFn: func(int) (bool, error) { return false, nil },
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+
+	_, err := svc.CreateSongReport(5, 10, "lyrics", "Wrong lyrics", "https://example.com/proof")
+
+	require.Error(t, err)
+	assert.Equal(t, "song not found", err.Error())
+}
+
+func TestSongService_CreateSongReport_MissingDescription(t *testing.T) {
+	mockSongs := &mocks.SongRepo{
+		ExistsByIDFn: func(int) (bool, error) { return true, nil },
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+
+	_, err := svc.CreateSongReport(5, 10, "lyrics", "   ", "https://example.com/proof")
+
+	require.Error(t, err)
+	assert.Equal(t, "description is required", err.Error())
+}
+
+func TestSongService_CreateSongReport_InvalidReportType(t *testing.T) {
+	mockSongs := &mocks.SongRepo{
+		ExistsByIDFn: func(int) (bool, error) { return true, nil },
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+
+	_, err := svc.CreateSongReport(5, 10, "tempo", "Wrong tempo", "https://example.com/proof")
+
+	require.Error(t, err)
+	assert.Equal(t, "invalid report_type: must be lyrics, chord, or other", err.Error())
+}
+
+func TestSongService_CreateSongReport_MissingEvidenceURL(t *testing.T) {
+	mockSongs := &mocks.SongRepo{
+		ExistsByIDFn: func(int) (bool, error) { return true, nil },
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+
+	_, err := svc.CreateSongReport(5, 10, "chord", "Wrong chord", "")
+
+	require.Error(t, err)
+	assert.Equal(t, "evidence_url must be a valid http or https URL", err.Error())
+}
+
+func TestSongService_CreateSongReport_InvalidEvidenceURL(t *testing.T) {
+	mockSongs := &mocks.SongRepo{
+		ExistsByIDFn: func(int) (bool, error) { return true, nil },
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+
+	_, err := svc.CreateSongReport(5, 10, "chord", "Wrong chord", "ftp://example.com/proof")
+
+	require.Error(t, err)
+	assert.Equal(t, "evidence_url must be a valid http or https URL", err.Error())
+}
+
+func TestSongService_UpdateSongReportStatus_InvalidStatus(t *testing.T) {
+	svc := &SongService{songs: &mocks.SongRepo{}, tags: &mocks.TagRepo{}}
+
+	err := svc.UpdateSongReportStatus(1, "in_progress", "")
+
+	require.Error(t, err)
+	assert.Equal(t, "invalid status: must be pending, approved, or rejected", err.Error())
+}
+
+func TestSongService_UpdateSongReportStatus_AllValidStatuses(t *testing.T) {
+	for _, status := range []string{"pending", "approved", "rejected"} {
+		mockSongs := &mocks.SongRepo{
+			UpdateSongReportStatusFn: func(_ int, gotStatus, _ string) error {
+				assert.Equal(t, status, gotStatus)
+				return nil
+			},
+		}
+		svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+
+		err := svc.UpdateSongReportStatus(1, status, "")
+
+		assert.NoError(t, err, "status %q must be accepted", status)
+	}
+}

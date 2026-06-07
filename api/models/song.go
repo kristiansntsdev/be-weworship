@@ -77,3 +77,56 @@ func (r *SongRequestRow) ToSongRequest() *SongRequest {
 	}
 	return sr
 }
+
+type SongReport struct {
+	ID          int       `db:"id"           json:"id"`
+	UserID      int       `db:"user_id"      json:"user_id"`
+	SongID      int       `db:"song_id"      json:"song_id"`
+	SongTitle   string    `db:"song_title"   json:"song_title"`
+	ReportType  string    `db:"report_type"  json:"report_type"`
+	Description string    `db:"description"  json:"description"`
+	EvidenceURL string    `db:"evidence_url" json:"evidence_url"`
+	Status      string    `db:"status"       json:"status"`
+	AdminNotes  *string   `db:"admin_notes"  json:"admin_notes,omitempty"`
+	CreatedAt   time.Time `db:"createdAt"    json:"createdAt"`
+	UpdatedAt   time.Time `db:"updatedAt"    json:"updatedAt"`
+}
+
+// SongReportRow is used for scanning report rows with nullable fields.
+type SongReportRow struct {
+	ID          int            `db:"id"`
+	UserID      int            `db:"user_id"`
+	SongID      int            `db:"song_id"`
+	SongTitle   string         `db:"song_title"`
+	ReportType  string         `db:"report_type"`
+	Description string         `db:"description"`
+	EvidenceURL string         `db:"evidence_url"`
+	Status      string         `db:"status"`
+	AdminNotes  sql.NullString `db:"admin_notes"`
+	CreatedAt   sql.NullTime   `db:"createdAt"`
+	UpdatedAt   sql.NullTime   `db:"updatedAt"`
+}
+
+// ToSongReport converts a row to a proper SongReport with clean JSON serialization.
+func (r *SongReportRow) ToSongReport() *SongReport {
+	report := &SongReport{
+		ID:          r.ID,
+		UserID:      r.UserID,
+		SongID:      r.SongID,
+		SongTitle:   r.SongTitle,
+		ReportType:  r.ReportType,
+		Description: r.Description,
+		EvidenceURL: r.EvidenceURL,
+		Status:      r.Status,
+	}
+	if r.AdminNotes.Valid {
+		report.AdminNotes = &r.AdminNotes.String
+	}
+	if r.CreatedAt.Valid {
+		report.CreatedAt = r.CreatedAt.Time
+	}
+	if r.UpdatedAt.Valid {
+		report.UpdatedAt = r.UpdatedAt.Time
+	}
+	return report
+}

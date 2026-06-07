@@ -368,3 +368,108 @@ func (h *Handler) DeleteSongRequest(c *fiber.Ctx) error {
 	}
 	return utils.OK(c, 200, "Song request deleted successfully", nil)
 }
+
+// ── Song Reports ──────────────────────────────────────────────────────────────
+
+func (h *Handler) CreateSongReport(c *fiber.Ctx) error {
+	var req struct {
+		SongID      int    `json:"song_id"`
+		ReportType  string `json:"report_type"`
+		Description string `json:"description"`
+		EvidenceURL string `json:"evidence_url"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Unauthorized")
+	}
+	result, err := h.songs.CreateSongReport(cl.UserID, req.SongID, req.ReportType, req.Description, req.EvidenceURL)
+	if err != nil {
+		switch err.Error() {
+		case "song_id is required", "song not found", "invalid report_type: must be lyrics, chord, or other", "description is required", "evidence_url must be a valid http or https URL":
+			return utils.Fail(c, 400, err.Error())
+		}
+		return utils.FailErr(c, 500, "Failed to submit song report", err)
+	}
+	return utils.OK(c, 201, "Song report submitted successfully", result)
+}
+
+func (h *Handler) GetMySongReports(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Unauthorized")
+	}
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 20)
+	data, total, err := h.songs.ListMySongReports(cl.UserID, page, limit)
+	if err != nil {
+		return utils.FailErr(c, 500, "Failed to retrieve song reports", err)
+	}
+	return utils.OK(c, 200, "Song reports retrieved successfully", fiber.Map{
+		"data":  data,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+func (h *Handler) DeleteSongReport(c *fiber.Ctx) error {
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid report ID")
+	}
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Unauthorized")
+	}
+	if err := h.songs.DeleteSongReport(id, cl.UserID); err != nil {
+		switch err.Error() {
+		case "not found":
+			return utils.Fail(c, 404, "Song report not found")
+		case "forbidden":
+			return utils.Fail(c, 403, "You can only delete your own song reports")
+		default:
+			return utils.FailErr(c, 500, "Failed to delete song report", err)
+		}
+	}
+	return utils.OK(c, 200, "Song report deleted successfully", nil)
+}
+
+func (h *Handler) GetSongReports(c *fiber.Ctx) error {
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 20)
+	status := c.Query("status")
+	data, total, err := h.songs.ListSongReports(status, page, limit)
+	if err != nil {
+		return utils.FailErr(c, 500, "Failed to retrieve song reports", err)
+	}
+	return utils.OK(c, 200, "Song reports retrieved successfully", fiber.Map{
+		"data":  data,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+func (h *Handler) UpdateSongReport(c *fiber.Ctx) error {
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid report ID")
+	}
+	var req struct {
+		Status     string `json:"status"`
+		AdminNotes string `json:"admin_notes"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	if err := h.songs.UpdateSongReportStatus(id, req.Status, req.AdminNotes); err != nil {
+		if err.Error() == "invalid status: must be pending, approved, or rejected" {
+			return utils.Fail(c, 400, err.Error())
+		}
+		return utils.FailErr(c, 500, "Failed to update song report", err)
+	}
+	return utils.OK(c, 200, "Song report updated successfully", nil)
+}

@@ -82,6 +82,12 @@ type SongRepo struct {
 	GetSongRequestByIDFn      func(int) (*models.SongRequest, bool, error)
 	ListUserSongRequestsFn    func(int, int, int) ([]models.SongRequest, int, error)
 	DeleteSongRequestFn       func(int, int) (bool, error)
+	CreateSongReportFn        func(int, int, string, string, string) (*models.SongReport, error)
+	ListSongReportsFn         func(string, int, int) ([]models.SongReport, int, error)
+	UpdateSongReportStatusFn  func(int, string, string) error
+	GetSongReportByIDFn       func(int) (*models.SongReport, bool, error)
+	ListUserSongReportsFn     func(int, int, int) ([]models.SongReport, int, error)
+	DeleteSongReportFn        func(int, int) (bool, error)
 }
 
 func (m *SongRepo) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool) ([]models.Song, int, error) {
@@ -195,6 +201,42 @@ func (m *SongRepo) ListUserSongRequests(userID, page, limit int) ([]models.SongR
 func (m *SongRepo) DeleteSongRequest(id, userID int) (bool, error) {
 	if m.DeleteSongRequestFn != nil {
 		return m.DeleteSongRequestFn(id, userID)
+	}
+	return false, nil
+}
+func (m *SongRepo) CreateSongReport(userID, songID int, reportType, description, evidenceURL string) (*models.SongReport, error) {
+	if m.CreateSongReportFn != nil {
+		return m.CreateSongReportFn(userID, songID, reportType, description, evidenceURL)
+	}
+	return nil, nil
+}
+func (m *SongRepo) ListSongReports(status string, page, limit int) ([]models.SongReport, int, error) {
+	if m.ListSongReportsFn != nil {
+		return m.ListSongReportsFn(status, page, limit)
+	}
+	return nil, 0, nil
+}
+func (m *SongRepo) UpdateSongReportStatus(id int, status, adminNotes string) error {
+	if m.UpdateSongReportStatusFn != nil {
+		return m.UpdateSongReportStatusFn(id, status, adminNotes)
+	}
+	return nil
+}
+func (m *SongRepo) GetSongReportByID(id int) (*models.SongReport, bool, error) {
+	if m.GetSongReportByIDFn != nil {
+		return m.GetSongReportByIDFn(id)
+	}
+	return nil, false, nil
+}
+func (m *SongRepo) ListUserSongReports(userID, page, limit int) ([]models.SongReport, int, error) {
+	if m.ListUserSongReportsFn != nil {
+		return m.ListUserSongReportsFn(userID, page, limit)
+	}
+	return nil, 0, nil
+}
+func (m *SongRepo) DeleteSongReport(id, userID int) (bool, error) {
+	if m.DeleteSongReportFn != nil {
+		return m.DeleteSongReportFn(id, userID)
 	}
 	return false, nil
 }

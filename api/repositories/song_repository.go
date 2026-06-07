@@ -295,3 +295,117 @@ func (r *SongRepository) DeleteSongRequest(id, userID int) (bool, error) {
 	n, _ := res.RowsAffected()
 	return n > 0, nil
 }
+
+// ── Song Reports ──────────────────────────────────────────────────────────────
+
+func (r *SongRepository) CreateSongReport(userID, songID int, reportType, description, evidenceURL string) (*models.SongReport, error) {
+	report := &models.SongReportRow{}
+	err := r.db.QueryRowx(
+		`INSERT INTO song_reports (user_id, song_id, report_type, description, evidence_url)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, user_id, song_id,
+			(SELECT title FROM songs WHERE id = $2) AS song_title,
+			report_type, description, evidence_url, status, admin_notes, "createdAt", "updatedAt"`,
+		userID, songID, reportType, description, evidenceURL,
+	).StructScan(report)
+	if err != nil {
+		return nil, err
+	}
+	return report.ToSongReport(), nil
+}
+
+func (r *SongRepository) ListSongReports(status string, page, limit int) ([]models.SongReport, int, error) {
+	offset := (page - 1) * limit
+	where := "1=1"
+	args := []any{}
+
+	if status != "" {
+		where = "sr.status = $1"
+		args = append(args, status)
+	}
+
+	var total int
+	countQ := `SELECT COUNT(*) FROM song_reports sr WHERE ` + where
+	if err := r.db.QueryRowx(r.db.Rebind(countQ), args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	dbRows := []models.SongReportRow{}
+	args = append(args, limit, offset)
+	q := r.db.Rebind(`SELECT sr.id, sr.user_id, sr.song_id, s.title AS song_title, sr.report_type,
+		sr.description, sr.evidence_url, sr.status, sr.admin_notes, sr."createdAt", sr."updatedAt"
+		FROM song_reports sr
+		JOIN songs s ON s.id = sr.song_id
+		WHERE ` + where + ` ORDER BY sr."createdAt" DESC LIMIT ? OFFSET ?`)
+	if err := r.db.Select(&dbRows, q, args...); err != nil {
+		return nil, 0, err
+	}
+
+	rows := make([]models.SongReport, len(dbRows))
+	for i, dbRow := range dbRows {
+		rows[i] = *dbRow.ToSongReport()
+	}
+	return rows, total, nil
+}
+
+func (r *SongRepository) UpdateSongReportStatus(id int, status, adminNotes string) error {
+	_, err := r.db.Exec(
+		`UPDATE song_reports SET status = $1, admin_notes = $2, "updatedAt" = NOW() WHERE id = $3`,
+		status, adminNotes, id,
+	)
+	return err
+}
+
+func (r *SongRepository) GetSongReportByID(id int) (*models.SongReport, bool, error) {
+	dbRow := &models.SongReportRow{}
+	err := r.db.QueryRowx(
+		`SELECT sr.id, sr.user_id, sr.song_id, s.title AS song_title, sr.report_type,
+		 sr.description, sr.evidence_url, sr.status, sr.admin_notes, sr."createdAt", sr."updatedAt"
+		 FROM song_reports sr
+		 JOIN songs s ON s.id = sr.song_id
+		 WHERE sr.id = $1`,
+		id,
+	).StructScan(dbRow)
+	if err == sql.ErrNoRows {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return dbRow.ToSongReport(), true, nil
+}
+
+func (r *SongRepository) ListUserSongReports(userID, page, limit int) ([]models.SongReport, int, error) {
+	offset := (page - 1) * limit
+	var total int
+	if err := r.db.QueryRowx(`SELECT COUNT(*) FROM song_reports WHERE user_id = $1`, userID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	dbRows := []models.SongReportRow{}
+	err := r.db.Select(&dbRows,
+		`SELECT sr.id, sr.user_id, sr.song_id, s.title AS song_title, sr.report_type,
+		 sr.description, sr.evidence_url, sr.status, sr.admin_notes, sr."createdAt", sr."updatedAt"
+		 FROM song_reports sr
+		 JOIN songs s ON s.id = sr.song_id
+		 WHERE sr.user_id = $1
+		 ORDER BY sr."createdAt" DESC LIMIT $2 OFFSET $3`,
+		userID, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows := make([]models.SongReport, len(dbRows))
+	for i, dbRow := range dbRows {
+		rows[i] = *dbRow.ToSongReport()
+	}
+	return rows, total, nil
+}
+
+func (r *SongRepository) DeleteSongReport(id, userID int) (bool, error) {
+	res, err := r.db.Exec(`DELETE FROM song_reports WHERE id = $1 AND user_id = $2`, id, userID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}

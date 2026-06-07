@@ -50,6 +50,9 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Post("/song-requests", ra, h.RequestSong)
 	api.Get("/song-requests", ra, h.GetMySongRequests)
 	api.Delete("/song-requests/:id", ra, h.DeleteSongRequest)
+	api.Post("/song-reports", ra, h.CreateSongReport)
+	api.Get("/song-reports", ra, h.GetMySongReports)
+	api.Delete("/song-reports/:id", ra, h.DeleteSongReport)
 	api.Get("/tags", h.GetTags)
 	api.Post("/tags/get-or-create", h.GetOrCreateTag)
 
@@ -125,6 +128,8 @@ func (h *Handler) Register(app *fiber.App) {
 	// Song requests: accessible by admin and maintainer (MUST be before admin group!)
 	api.Get("/admin/song-requests", ra, rm, h.GetSongRequests)
 	api.Put("/admin/song-requests/:id", ra, rm, h.UpdateSongRequest)
+	api.Get("/admin/song-reports", ra, rm, h.GetSongReports)
+	api.Put("/admin/song-reports/:id", ra, rm, h.UpdateSongReport)
 	api.Get("/admin/fcm-status", ra, rm, h.GetFCMStatus)
 
 	admin := api.Group("/admin", ra, h.authMW.RequireAdmin)
