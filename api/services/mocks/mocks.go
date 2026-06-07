@@ -518,6 +518,7 @@ type UserRepo struct {
 	GetDetailFn             func(int) (*models.UserDetail, error)
 	UpsertDetailFn          func(int, *string, *string, *string, *string) error
 	FindByIDFn              func(int) (*models.User, error)
+	UpdateRoleFn            func(int, string) (*models.User, error)
 	UpdateAvatarURLFn       func(int, string) error
 	FindByEmailFn           func(string) (*models.User, error)
 	CreateDeletionRequestFn func(string, *int, string) error
@@ -550,6 +551,12 @@ func (m *UserRepo) UpsertDetail(userID int, fullName, province, city, postalCode
 func (m *UserRepo) FindByID(userID int) (*models.User, error) {
 	if m.FindByIDFn != nil {
 		return m.FindByIDFn(userID)
+	}
+	return nil, nil
+}
+func (m *UserRepo) UpdateRole(userID int, role string) (*models.User, error) {
+	if m.UpdateRoleFn != nil {
+		return m.UpdateRoleFn(userID, role)
 	}
 	return nil, nil
 }

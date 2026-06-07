@@ -95,6 +95,52 @@ func TestUserService_UpdateAvatarURL_Success(t *testing.T) {
 	assert.Equal(t, "https://example.com/avatar.jpg", gotURL)
 }
 
+// ── UpdateRole ────────────────────────────────────────────────────────────────
+
+func TestUserService_UpdateRole_Success(t *testing.T) {
+	var gotUserID int
+	var gotRole string
+	mockRepo := &mocks.UserRepo{
+		UpdateRoleFn: func(userID int, role string) (*models.User, error) {
+			gotUserID = userID
+			gotRole = role
+			return &models.User{ID: userID, Role: role}, nil
+		},
+	}
+	svc := &UserService{repo: mockRepo}
+	user, status, err := svc.UpdateRole(7, "maintainer")
+
+	require.NoError(t, err)
+	assert.Equal(t, 200, status)
+	require.NotNil(t, user)
+	assert.Equal(t, 7, gotUserID)
+	assert.Equal(t, "maintainer", gotRole)
+}
+
+func TestUserService_UpdateRole_InvalidRole(t *testing.T) {
+	mockRepo := &mocks.UserRepo{}
+	svc := &UserService{repo: mockRepo}
+	user, status, err := svc.UpdateRole(7, "admin")
+
+	require.Error(t, err)
+	assert.Nil(t, user)
+	assert.Equal(t, 400, status)
+}
+
+func TestUserService_UpdateRole_NotFound(t *testing.T) {
+	mockRepo := &mocks.UserRepo{
+		UpdateRoleFn: func(int, string) (*models.User, error) {
+			return nil, sql.ErrNoRows
+		},
+	}
+	svc := &UserService{repo: mockRepo}
+	user, status, err := svc.UpdateRole(404, "user")
+
+	require.Error(t, err)
+	assert.Nil(t, user)
+	assert.Equal(t, 404, status)
+}
+
 // ── GetAvatarURL ──────────────────────────────────────────────────────────────
 
 func TestUserService_GetAvatarURL_Set(t *testing.T) {

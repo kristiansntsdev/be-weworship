@@ -68,3 +68,31 @@ func (h *Handler) GetUsers(c *fiber.Ctx) error {
 		},
 	})
 }
+
+func (h *Handler) UpdateUserRole(c *fiber.Ctx) error {
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, err.Error())
+	}
+	var req struct {
+		Role string `json:"role"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid request body")
+	}
+	role := strings.ToLower(strings.TrimSpace(req.Role))
+	u, status, err := h.users.UpdateRole(id, role)
+	if err != nil {
+		return utils.FailErr(c, status, err.Error(), err)
+	}
+	return utils.OK(c, 200, "User role updated successfully", fiber.Map{
+		"id":        u.ID,
+		"username":  u.Username,
+		"email":     u.Email,
+		"role":      u.Role,
+		"provider":  u.Provider,
+		"verified":  u.Verified,
+		"status":    u.Status,
+		"createdAt": u.CreatedAt,
+	})
+}

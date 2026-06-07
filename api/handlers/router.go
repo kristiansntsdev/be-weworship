@@ -134,6 +134,7 @@ func (h *Handler) Register(app *fiber.App) {
 
 	admin := api.Group("/admin", ra, h.authMW.RequireAdmin)
 	admin.Get("/users", h.GetUsers)
+	admin.Put("/users/:id/role", h.UpdateUserRole)
 
 	// Analytics (admin read)
 	admin.Get("/analytics/songs", h.GetAnalyticsSongs)

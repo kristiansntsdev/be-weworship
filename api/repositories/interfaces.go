@@ -101,6 +101,7 @@ type UserRepoIface interface {
 	GetDetail(userID int) (*models.UserDetail, error)
 	UpsertDetail(userID int, fullName, province, city, postalCode *string) error
 	FindByID(userID int) (*models.User, error)
+	UpdateRole(userID int, role string) (*models.User, error)
 	UpdateAvatarURL(userID int, avatarURL string) error
 	FindByEmail(email string) (*models.User, error)
 	CreateDeletionRequest(email string, userID *int, ipAddress string) error

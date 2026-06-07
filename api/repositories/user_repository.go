@@ -69,12 +69,26 @@ func (r *UserRepository) UpsertDetail(userID int, fullName, province, city, post
 }
 
 func (r *UserRepository) FindByID(userID int) (*models.User, error) {
-var u models.User
-err := r.db.Get(&u, `SELECT id, username, email, role, provider, verified, status, avatar_url, "createdAt", "updatedAt" FROM users WHERE id = $1`, userID)
-if err != nil {
-return nil, err
+	var u models.User
+	err := r.db.Get(&u, `SELECT id, username, email, role, provider, verified, status, avatar_url, "createdAt", "updatedAt" FROM users WHERE id = $1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
-return &u, nil
+
+func (r *UserRepository) UpdateRole(userID int, role string) (*models.User, error) {
+	var u models.User
+	err := r.db.Get(
+		&u,
+		`UPDATE users SET role = $1, "updatedAt" = NOW() WHERE id = $2 RETURNING id, username, email, role, provider, verified, status, avatar_url, "createdAt", "updatedAt"`,
+		role,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
 
 func (r *UserRepository) UpdateAvatarURL(userID int, avatarURL string) error {
