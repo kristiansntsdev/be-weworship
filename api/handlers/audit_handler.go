@@ -26,7 +26,7 @@ func (h *Handler) GetAuditLogs(c *fiber.Ctx) error {
 
 	rows, total, err := h.audit.List(action, entityType, userID, page, limit)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to retrieve audit logs")
+		return utils.FailErr(c, 500, "Failed to retrieve audit logs", err)
 	}
 
 	cl := middleware.GetClaims(c)

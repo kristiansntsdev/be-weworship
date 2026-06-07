@@ -10,7 +10,7 @@ func (h *Handler) GetMyTeams(c *fiber.Ctx) error {
 	cl := middleware.GetClaims(c)
 	rows, err := h.teams.ListByLead(cl.UserID)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to retrieve playlist teams")
+		return utils.FailErr(c, 500, "Failed to retrieve playlist teams", err)
 	}
 	return utils.OK(c, 200, "Playlist teams retrieved successfully", rows)
 }
@@ -22,7 +22,7 @@ func (h *Handler) GetTeamByID(c *fiber.Ctx) error {
 	}
 	data, status, err := h.teams.GetByID(teamID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, 200, "Playlist team details retrieved successfully", data)
 }
@@ -39,7 +39,7 @@ func (h *Handler) RemoveMember(c *fiber.Ctx) error {
 	}
 	status, err := h.teams.RemoveMember(teamID, memberID, cl.UserID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, 200, "Member removed from team successfully", fiber.Map{"team_id": teamID, "user_id": memberID})
 }
@@ -54,7 +54,7 @@ func (h *Handler) LeaveTeam(c *fiber.Ctx) error {
 	ownerID, playlistName, ownerErr := h.playlists.GetOwnerByTeamID(teamID)
 	status, err := h.teams.Leave(teamID, cl.UserID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	// Notify the playlist owner that a member left
 	if ownerErr == nil && ownerID != cl.UserID {
@@ -81,7 +81,7 @@ func (h *Handler) PromoteCoLead(c *fiber.Ctx) error {
 	}
 	status, err := h.teams.PromoteToCoLead(teamID, cl.UserID, req.UserID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, 200, "Member promoted to co-lead successfully", fiber.Map{"team_id": teamID, "user_id": req.UserID})
 }
@@ -98,7 +98,7 @@ func (h *Handler) DemoteCoLead(c *fiber.Ctx) error {
 	}
 	status, err := h.teams.DemoteCoLead(teamID, cl.UserID, coLeadID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, 200, "Co-lead demoted successfully", fiber.Map{"team_id": teamID, "user_id": coLeadID})
 }
@@ -111,7 +111,7 @@ func (h *Handler) DeleteTeam(c *fiber.Ctx) error {
 	}
 	status, err := h.teams.Delete(teamID, cl.UserID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, 200, "Playlist team deleted successfully", fiber.Map{"id": teamID})
 }
@@ -126,7 +126,7 @@ func (h *Handler) GetPlaylistMembers(c *fiber.Ctx) error {
 	}
 	data, status, err := h.teams.ListMembers(playlistID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, 200, "Playlist members retrieved successfully", data)
 }
@@ -150,7 +150,7 @@ func (h *Handler) SetPlaylistMemberRole(c *fiber.Ctx) error {
 	}
 	status, err := h.teams.SetMemberRole(playlistID, cl.UserID, targetUserID, req.Role)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, 200, "Member role updated successfully", fiber.Map{
 		"playlist_id": playlistID,

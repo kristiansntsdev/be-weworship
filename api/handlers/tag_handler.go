@@ -10,7 +10,7 @@ import (
 func (h *Handler) GetTags(c *fiber.Ctx) error {
 	rows, err := h.tags.List(c.Query("search"))
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to retrieve tags")
+		return utils.FailErr(c, 500, "Failed to retrieve tags", err)
 	}
 	return utils.OK(c, 200, "Tags retrieved successfully", rows)
 }
@@ -27,7 +27,7 @@ func (h *Handler) GetOrCreateTag(c *fiber.Ctx) error {
 	}
 	tag, created, err := h.tags.GetOrCreate(req.Name)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to get/create tag")
+		return utils.FailErr(c, 500, "Failed to get/create tag", err)
 	}
 	msg := "Tag retrieved successfully"
 	if created {

@@ -22,7 +22,7 @@ func (h *Handler) SearchUsers(c *fiber.Ctx) error {
 	}
 	users, err := h.invitations.SearchUsers(q, cl.UserID)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to search users")
+		return utils.FailErr(c, 500, "Failed to search users", err)
 	}
 	return utils.OK(c, 200, "OK", users)
 }
@@ -47,7 +47,7 @@ func (h *Handler) SendInvitation(c *fiber.Ctx) error {
 	}
 	invitationID, status, err := h.invitations.SendInvitation(playlistID, cl.UserID, req.InviteeID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, status, "Invitation sent", fiber.Map{"invitation_id": invitationID})
 }
@@ -65,7 +65,7 @@ func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
 	}
 	status, err := h.invitations.AcceptInvitation(id, cl.UserID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, 200, "Invitation accepted", nil)
 }
@@ -83,7 +83,7 @@ func (h *Handler) DeclineInvitation(c *fiber.Ctx) error {
 	}
 	status, err := h.invitations.DeclineInvitation(id, cl.UserID)
 	if err != nil {
-		return utils.Fail(c, status, err.Error())
+		return utils.FailErr(c, status, err.Error(), err)
 	}
 	return utils.OK(c, 200, "Invitation declined", nil)
 }

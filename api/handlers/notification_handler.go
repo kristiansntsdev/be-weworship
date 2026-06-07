@@ -30,7 +30,7 @@ func (h *Handler) RegisterDeviceToken(c *fiber.Ctx) error {
 	}
 
 	if err := h.notifications.SaveDeviceToken(cl.UserID, req.Token, req.Platform); err != nil {
-		return utils.Fail(c, 500, "Failed to save device token")
+		return utils.FailErr(c, 500, "Failed to save device token", err)
 	}
 	return utils.OK(c, 200, "Device token registered", nil)
 }
@@ -52,7 +52,7 @@ func (h *Handler) UnregisterDeviceToken(c *fiber.Ctx) error {
 	}
 
 	if err := h.notifications.RemoveDeviceToken(cl.UserID, req.Token); err != nil {
-		return utils.Fail(c, 500, "Failed to remove device token")
+		return utils.FailErr(c, 500, "Failed to remove device token", err)
 	}
 	return utils.OK(c, 200, "Device token removed", nil)
 }
@@ -72,7 +72,7 @@ func (h *Handler) GetNotifications(c *fiber.Ctx) error {
 	}
 	rows, err := h.notifications.GetNotifications(cl.UserID, page, limit)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to fetch notifications")
+		return utils.FailErr(c, 500, "Failed to fetch notifications", err)
 	}
 	return utils.OK(c, 200, "OK", rows)
 }
@@ -87,7 +87,7 @@ func (h *Handler) GetUnreadCount(c *fiber.Ctx) error {
 	}
 	count, err := h.notifications.GetUnreadCount(cl.UserID)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to fetch unread count")
+		return utils.FailErr(c, 500, "Failed to fetch unread count", err)
 	}
 	return utils.OK(c, 200, "OK", fiber.Map{"unread_count": count})
 }
@@ -104,7 +104,7 @@ func (h *Handler) MarkNotificationRead(c *fiber.Ctx) error {
 		return utils.Fail(c, 400, "invalid notification id")
 	}
 	if err := h.notifications.MarkAsRead(id, cl.UserID); err != nil {
-		return utils.Fail(c, 500, "Failed to mark notification as read")
+		return utils.FailErr(c, 500, "Failed to mark notification as read", err)
 	}
 	return utils.OK(c, 200, "Notification marked as read", nil)
 }

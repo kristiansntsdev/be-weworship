@@ -17,7 +17,7 @@ var chordProPattern = regexp.MustCompile(`\[[A-G][^\]\n]{0,6}\]`)
 func (h *Handler) GetHome(c *fiber.Ctx) error {
 	stats, err := h.songs.HomeStats()
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to retrieve home stats")
+		return utils.FailErr(c, 500, "Failed to retrieve home stats", err)
 	}
 	return utils.OK(c, 200, "Home stats retrieved successfully", stats)
 }
@@ -25,7 +25,7 @@ func (h *Handler) GetHome(c *fiber.Ctx) error {
 func (h *Handler) GetArtists(c *fiber.Ctx) error {
 	artists, err := h.songs.Artists()
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to retrieve artists")
+		return utils.FailErr(c, 500, "Failed to retrieve artists", err)
 	}
 	return utils.OK(c, 200, "Artists retrieved successfully", artists)
 }
@@ -67,7 +67,7 @@ func (h *Handler) GetSongs(c *fiber.Ctx) error {
 	}
 	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), hasLink, chordPro, isMobileClient)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to retrieve songs")
+		return utils.FailErr(c, 500, "Failed to retrieve songs", err)
 	}
 	return c.JSON(fiber.Map{"code": 200, "message": "Songs retrieved successfully", "data": data, "pagination": pagination})
 }
@@ -83,7 +83,7 @@ func isMobileUserAgent(ua string) bool {
 func (h *Handler) GetSongsExport(c *fiber.Ctx) error {
 	data, err := h.songs.ExportSongs()
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to export songs")
+		return utils.FailErr(c, 500, "Failed to export songs", err)
 	}
 	return utils.OK(c, 200, "Songs exported successfully", data)
 }
@@ -94,7 +94,7 @@ func (h *Handler) GetSongByID(c *fiber.Ctx) error {
 	if numID, err := parseInt(identifier); err == nil {
 		data, found, err := h.songs.GetByID(numID)
 		if err != nil {
-			return utils.Fail(c, 500, "Failed to retrieve song")
+			return utils.FailErr(c, 500, "Failed to retrieve song", err)
 		}
 		if !found {
 			return utils.Fail(c, 404, "Song not found")
@@ -103,7 +103,7 @@ func (h *Handler) GetSongByID(c *fiber.Ctx) error {
 	}
 	data, found, err := h.songs.GetBySlug(identifier)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to retrieve song")
+		return utils.FailErr(c, 500, "Failed to retrieve song", err)
 	}
 	if !found {
 		return utils.Fail(c, 404, "Song not found")
@@ -131,7 +131,7 @@ func (h *Handler) CreateSong(c *fiber.Ctx) error {
 	}
 	out, err := h.songs.Create(req.Title, req.Artist, req.BaseChord, req.Bpm, req.LyricsAndChord, req.ExternalLinks, req.DmcaTakedown, req.DmcaStatusNotes, req.TagNames)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to create song")
+		return utils.FailErr(c, 500, "Failed to create song", err)
 	}
 	cl := middleware.GetClaims(c)
 	if cl != nil {
@@ -172,7 +172,7 @@ func (h *Handler) UpdateSong(c *fiber.Ctx) error {
 
 	ok, err := h.songs.Update(id, req.Title, req.Artist, req.BaseChord, req.Bpm, req.LyricsAndChord, req.ExternalLinks, req.DmcaTakedown, req.DmcaStatusNotes, req.TagNames, hasTagNames)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to update song")
+		return utils.FailErr(c, 500, "Failed to update song", err)
 	}
 	if !ok {
 		return utils.Fail(c, 404, "Song not found")
@@ -227,7 +227,7 @@ func (h *Handler) DeleteSong(c *fiber.Ctx) error {
 	before, _, _ := h.songs.GetByID(id)
 	ok, err := h.songs.Delete(id)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to delete song")
+		return utils.FailErr(c, 500, "Failed to delete song", err)
 	}
 	if !ok {
 		return utils.Fail(c, 404, "Song not found")
@@ -277,7 +277,7 @@ func (h *Handler) RequestSong(c *fiber.Ctx) error {
 		if err.Error() == "song_title is required" || err.Error() == "reference_link is required" {
 			return utils.Fail(c, 400, err.Error())
 		}
-		return utils.Fail(c, 500, "Failed to submit song request")
+		return utils.FailErr(c, 500, "Failed to submit song request", err)
 	}
 	return utils.OK(c, 201, "Song request submitted successfully", result)
 }
@@ -288,7 +288,7 @@ func (h *Handler) GetSongRequests(c *fiber.Ctx) error {
 	status := c.Query("status")
 	data, total, err := h.songs.ListSongRequests(status, page, limit)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to retrieve song requests")
+		return utils.FailErr(c, 500, "Failed to retrieve song requests", err)
 	}
 	return utils.OK(c, 200, "Song requests retrieved successfully", fiber.Map{
 		"data":  data,
@@ -316,7 +316,7 @@ func (h *Handler) UpdateSongRequest(c *fiber.Ctx) error {
 		if err.Error() == "invalid status: must be pending, approved, or rejected" {
 			return utils.Fail(c, 400, err.Error())
 		}
-		return utils.Fail(c, 500, "Failed to update song request")
+		return utils.FailErr(c, 500, "Failed to update song request", err)
 	}
 	// Notify the requester when status changes to approved or rejected
 	if found && songReq != nil && (req.Status == "approved" || req.Status == "rejected") {
@@ -334,7 +334,7 @@ func (h *Handler) GetMySongRequests(c *fiber.Ctx) error {
 	limit := c.QueryInt("limit", 20)
 	data, total, err := h.songs.ListMySongRequests(cl.UserID, page, limit)
 	if err != nil {
-		return utils.Fail(c, 500, "Failed to retrieve song requests")
+		return utils.FailErr(c, 500, "Failed to retrieve song requests", err)
 	}
 	return utils.OK(c, 200, "Song requests retrieved successfully", fiber.Map{
 		"data":  data,
@@ -360,7 +360,7 @@ func (h *Handler) DeleteSongRequest(c *fiber.Ctx) error {
 		case "forbidden":
 			return utils.Fail(c, 403, "You can only delete your own song requests")
 		default:
-			return utils.Fail(c, 500, "Failed to delete song request")
+			return utils.FailErr(c, 500, "Failed to delete song request", err)
 		}
 	}
 	return utils.OK(c, 200, "Song request deleted successfully", nil)

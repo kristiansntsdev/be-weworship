@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"be-songbanks-v1/api/models"
 	"be-songbanks-v1/api/utils"
@@ -137,15 +138,17 @@ type PlaylistPreview struct {
 func (r *PlaylistRepository) GetPreviewByShareToken(shareToken string) (*PlaylistPreview, error) {
 	var p PlaylistPreview
 	err := r.db.QueryRowx(r.db.Rebind(`
-		SELECT p.playlist_name, u.name AS owner_name, COALESCE(p.songs,'') AS songs
+		SELECT p.playlist_name, COALESCE(ud.full_name, u.username) AS owner_name, COALESCE(p.songs,'') AS songs
 		FROM playlists p
 		JOIN users u ON u.id = p.user_id
+		LEFT JOIN users_detail ud ON ud.user_id = u.id
 		WHERE p.share_token=? AND p.is_shared=1
 	`), shareToken).StructScan(&p)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
+		log.Printf("[PlaylistRepository] Error on get playlist owner username share_token=%q: %v", shareToken, err)
 		return nil, err
 	}
 	return &p, nil
