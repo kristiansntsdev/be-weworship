@@ -316,7 +316,7 @@ func (h *Handler) UpdateSongRequest(c *fiber.Ctx) error {
 	// Fetch request before update so we have the title and requester ID
 	songReq, found, _ := h.songs.GetSongRequestByID(id)
 	if err := h.songs.UpdateSongRequestStatus(id, req.Status, req.AdminNotes); err != nil {
-		if err.Error() == "invalid status: must be pending, approved, or rejected" {
+		if err.Error() == "invalid status: must be pending, in_progress, approved, or rejected" {
 			return utils.Fail(c, 400, err.Error())
 		}
 		return utils.FailErr(c, 500, "Failed to update song request", err)

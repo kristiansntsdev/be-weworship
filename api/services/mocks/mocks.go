@@ -78,6 +78,7 @@ type SongRepo struct {
 	CreateSongRequestFn       func(int, string, string, string, string) (*models.SongRequest, error)
 	ListSongRequestsFn        func(string, int, int) ([]models.SongRequest, int, error)
 	UpdateSongRequestStatusFn func(int, string, string) error
+	ClearSongRequestLyricsFn  func(int) error
 	GetSongRequestByIDFn      func(int) (*models.SongRequest, bool, error)
 	ListUserSongRequestsFn    func(int, int, int) ([]models.SongRequest, int, error)
 	DeleteSongRequestFn       func(int, int) (bool, error)
@@ -170,6 +171,12 @@ func (m *SongRepo) ListSongRequests(status string, page, limit int) ([]models.So
 func (m *SongRepo) UpdateSongRequestStatus(id int, status, adminNotes string) error {
 	if m.UpdateSongRequestStatusFn != nil {
 		return m.UpdateSongRequestStatusFn(id, status, adminNotes)
+	}
+	return nil
+}
+func (m *SongRepo) ClearSongRequestLyrics(id int) error {
+	if m.ClearSongRequestLyricsFn != nil {
+		return m.ClearSongRequestLyricsFn(id)
 	}
 	return nil
 }

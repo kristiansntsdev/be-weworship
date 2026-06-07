@@ -242,6 +242,14 @@ func (r *SongRepository) UpdateSongRequestStatus(id int, status, adminNotes stri
 	return err
 }
 
+func (r *SongRepository) ClearSongRequestLyrics(id int) error {
+	_, err := r.db.Exec(
+		`UPDATE song_requests SET lyrics = '', "updatedAt" = NOW() WHERE id = $1`,
+		id,
+	)
+	return err
+}
+
 func (r *SongRepository) GetSongRequestByID(id int) (*models.SongRequest, bool, error) {
 	dbRow := &models.SongRequestRow{}
 	err := r.db.QueryRowx(

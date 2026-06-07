@@ -472,7 +472,13 @@ func (s *SongService) UpdateSongRequestStatus(id int, status, adminNotes string)
 	if !validStatuses[status] {
 		return fmt.Errorf("invalid status: must be pending, in_progress, approved, or rejected")
 	}
-	return s.songs.UpdateSongRequestStatus(id, status, adminNotes)
+	if err := s.songs.UpdateSongRequestStatus(id, status, adminNotes); err != nil {
+		return err
+	}
+	if status == "approved" {
+		return s.songs.ClearSongRequestLyrics(id)
+	}
+	return nil
 }
 
 func (s *SongService) ListMySongRequests(userID, page, limit int) ([]models.SongRequest, int, error) {

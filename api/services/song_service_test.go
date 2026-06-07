@@ -203,6 +203,41 @@ func TestSongService_UpdateSongRequestStatus_ValidStatus(t *testing.T) {
 	assert.Equal(t, "approved", gotStatus)
 }
 
+func TestSongService_UpdateSongRequestStatus_ApprovedClearsLyrics(t *testing.T) {
+	clearCalled := false
+	mockSongs := &mocks.SongRepo{
+		UpdateSongRequestStatusFn: func(int, string, string) error { return nil },
+		ClearSongRequestLyricsFn: func(id int) error {
+			clearCalled = true
+			assert.Equal(t, 1, id)
+			return nil
+		},
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+
+	err := svc.UpdateSongRequestStatus(1, "approved", "Song added")
+
+	require.NoError(t, err)
+	assert.True(t, clearCalled, "approved requests must drop stored lyrics content")
+}
+
+func TestSongService_UpdateSongRequestStatus_InProgressKeepsLyrics(t *testing.T) {
+	clearCalled := false
+	mockSongs := &mocks.SongRepo{
+		UpdateSongRequestStatusFn: func(int, string, string) error { return nil },
+		ClearSongRequestLyricsFn: func(int) error {
+			clearCalled = true
+			return nil
+		},
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+
+	err := svc.UpdateSongRequestStatus(1, "in_progress", "")
+
+	require.NoError(t, err)
+	assert.False(t, clearCalled, "lyrics should remain while a request is still being worked")
+}
+
 func TestSongService_UpdateSongRequestStatus_AllValidStatuses(t *testing.T) {
 	for _, status := range []string{"pending", "in_progress", "approved", "rejected"} {
 		mockSongs := &mocks.SongRepo{

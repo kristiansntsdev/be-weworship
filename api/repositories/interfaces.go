@@ -34,6 +34,7 @@ type SongRepoIface interface {
 	CreateSongRequest(userID int, songTitle, referenceLink, lyricsType, lyrics string) (*models.SongRequest, error)
 	ListSongRequests(status string, page, limit int) ([]models.SongRequest, int, error)
 	UpdateSongRequestStatus(id int, status, adminNotes string) error
+	ClearSongRequestLyrics(id int) error
 	GetSongRequestByID(id int) (*models.SongRequest, bool, error)
 	ListUserSongRequests(userID, page, limit int) ([]models.SongRequest, int, error)
 	DeleteSongRequest(id, userID int) (bool, error)
