@@ -6,20 +6,20 @@ import (
 )
 
 type Song struct {
-	ID               int            `db:"id"`
-	Slug             sql.NullString `db:"slug"`
-	Title            string         `db:"title"`
-	Artist           sql.NullString `db:"artist"`
-	BaseChord        sql.NullString `db:"base_chord"`
-	Bpm              sql.NullInt64  `db:"bpm"`
-	LyricsAndChord   sql.NullString `db:"lyrics_and_chords"`
-	PlainLyrics      sql.NullString `db:"plain_lyrics"`
-	ExternalLinks    sql.NullString `db:"external_links"`
-	DmcaTakedown     bool           `db:"dmca_takedown"`
-	DmcaStatusNotes  sql.NullString `db:"dmca_status_notes"`
-	CreatedBy        sql.NullInt64  `db:"created_by"`
-	CreatedAt        sql.NullTime   `db:"createdAt"`
-	UpdatedAt        sql.NullTime   `db:"updatedAt"`
+	ID              int            `db:"id"`
+	Slug            sql.NullString `db:"slug"`
+	Title           string         `db:"title"`
+	Artist          sql.NullString `db:"artist"`
+	BaseChord       sql.NullString `db:"base_chord"`
+	Bpm             sql.NullInt64  `db:"bpm"`
+	LyricsAndChord  sql.NullString `db:"lyrics_and_chords"`
+	PlainLyrics     sql.NullString `db:"plain_lyrics"`
+	ExternalLinks   sql.NullString `db:"external_links"`
+	DmcaTakedown    bool           `db:"dmca_takedown"`
+	DmcaStatusNotes sql.NullString `db:"dmca_status_notes"`
+	CreatedBy       sql.NullInt64  `db:"created_by"`
+	CreatedAt       sql.NullTime   `db:"createdAt"`
+	UpdatedAt       sql.NullTime   `db:"updatedAt"`
 }
 
 type Tag struct {
@@ -33,6 +33,8 @@ type SongRequest struct {
 	UserID        int       `db:"user_id"       json:"user_id"`
 	SongTitle     string    `db:"song_title"    json:"song_title"`
 	ReferenceLink string    `db:"reference_link" json:"reference_link"`
+	LyricsType    string    `db:"lyrics_type"   json:"lyrics_type"`
+	Lyrics        string    `db:"lyrics"        json:"lyrics"`
 	Status        string    `db:"status"        json:"status"`
 	AdminNotes    *string   `db:"admin_notes"   json:"admin_notes,omitempty"`
 	CreatedAt     time.Time `db:"createdAt"     json:"createdAt"`
@@ -45,6 +47,8 @@ type SongRequestRow struct {
 	UserID        int            `db:"user_id"`
 	SongTitle     string         `db:"song_title"`
 	ReferenceLink string         `db:"reference_link"`
+	LyricsType    string         `db:"lyrics_type"`
+	Lyrics        string         `db:"lyrics"`
 	Status        string         `db:"status"`
 	AdminNotes    sql.NullString `db:"admin_notes"`
 	CreatedAt     sql.NullTime   `db:"createdAt"`
@@ -58,6 +62,8 @@ func (r *SongRequestRow) ToSongRequest() *SongRequest {
 		UserID:        r.UserID,
 		SongTitle:     r.SongTitle,
 		ReferenceLink: r.ReferenceLink,
+		LyricsType:    r.LyricsType,
+		Lyrics:        r.Lyrics,
 		Status:        r.Status,
 	}
 	if r.AdminNotes.Valid {

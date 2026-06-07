@@ -368,10 +368,10 @@ func (s *SongService) ExportSongs() ([]map[string]any, error) {
 	for _, r := range rows {
 		sp, yt, am := parseExternalLinks(r.ExternalLinks.String)
 		data = append(data, map[string]any{
-			"id":                r.ID,
-			"title":             r.Title,
-			"artist":            utils.ParseArtists(r.Artist.String),
-			"base_chord":        utils.NullableString(r.BaseChord),
+			"id":         r.ID,
+			"title":      r.Title,
+			"artist":     utils.ParseArtists(r.Artist.String),
+			"base_chord": utils.NullableString(r.BaseChord),
 			"bpm": func() any {
 				if r.Bpm.Valid {
 					return r.Bpm.Int64
@@ -438,14 +438,23 @@ func buildSongsCacheKey(page, limit int, search, baseChord, sortBy, sortOrder st
 
 // ── Song Requests ─────────────────────────────────────────────────────────────
 
-func (s *SongService) RequestSong(userID int, songTitle, referenceLink string) (*models.SongRequest, error) {
+func (s *SongService) RequestSong(userID int, songTitle, referenceLink, lyricsType, lyrics string) (*models.SongRequest, error) {
 	if strings.TrimSpace(songTitle) == "" {
 		return nil, fmt.Errorf("song_title is required")
 	}
-	if strings.TrimSpace(referenceLink) == "" {
-		return nil, fmt.Errorf("reference_link is required")
+	referenceLink = strings.TrimSpace(referenceLink)
+	lyrics = strings.TrimSpace(lyrics)
+	if referenceLink == "" && lyrics == "" {
+		return nil, fmt.Errorf("lyrics or reference_link is required")
 	}
-	return s.songs.CreateSongRequest(userID, strings.TrimSpace(songTitle), strings.TrimSpace(referenceLink))
+	lyricsType = strings.TrimSpace(lyricsType)
+	if lyricsType == "" {
+		lyricsType = "lyrics"
+	}
+	if lyricsType != "lyrics" && lyricsType != "lyrics_chords" {
+		return nil, fmt.Errorf("invalid lyrics_type: must be lyrics or lyrics_chords")
+	}
+	return s.songs.CreateSongRequest(userID, strings.TrimSpace(songTitle), referenceLink, lyricsType, lyrics)
 }
 
 func (s *SongService) ListSongRequests(status string, page, limit int) ([]models.SongRequest, int, error) {

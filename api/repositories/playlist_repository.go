@@ -130,18 +130,33 @@ func (r *PlaylistRepository) FindByShareToken(shareToken string) (playlistID, ow
 }
 
 type PlaylistPreview struct {
-	Name      string `db:"playlist_name"`
-	OwnerName string `db:"owner_name"`
-	SongsRaw  string `db:"songs"`
+	Name        string `db:"playlist_name"`
+	OwnerName   string `db:"owner_name"`
+	SongsRaw    string `db:"songs"`
+	MemberCount int    `db:"member_count"`
 }
 
 func (r *PlaylistRepository) GetPreviewByShareToken(shareToken string) (*PlaylistPreview, error) {
 	var p PlaylistPreview
 	err := r.db.QueryRowx(r.db.Rebind(`
-		SELECT p.playlist_name, COALESCE(ud.full_name, u.username) AS owner_name, COALESCE(p.songs,'') AS songs
+		SELECT
+			p.playlist_name,
+			COALESCE(ud.full_name, u.username) AS owner_name,
+			COALESCE(p.songs,'') AS songs,
+			GREATEST(
+				COALESCE(
+					CASE
+						WHEN pt.members IS NULL OR TRIM(pt.members) = '' OR TRIM(pt.members) = 'null' THEN NULL
+						ELSE jsonb_array_length(pt.members::jsonb)
+					END,
+					0
+				),
+				1
+			) AS member_count
 		FROM playlists p
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN users_detail ud ON ud.user_id = u.id
+		LEFT JOIN playlist_teams pt ON pt.playlist_id = p.id
 		WHERE p.share_token=? AND p.is_shared=1
 	`), shareToken).StructScan(&p)
 	if err == sql.ErrNoRows {

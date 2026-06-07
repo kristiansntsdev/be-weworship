@@ -208,6 +208,8 @@ CREATE TABLE IF NOT EXISTS song_requests (
     user_id         INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     song_title      VARCHAR(255) NOT NULL,
     reference_link  TEXT        NOT NULL,
+    lyrics_type     VARCHAR(20) NOT NULL DEFAULT 'lyrics' CHECK (lyrics_type IN ('lyrics', 'lyrics_chords')),
+    lyrics          TEXT        NOT NULL DEFAULT '',
     status          VARCHAR(20) NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected'
     admin_notes     TEXT,
     "createdAt"     TIMESTAMP   NOT NULL DEFAULT NOW(),

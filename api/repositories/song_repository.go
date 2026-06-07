@@ -117,7 +117,7 @@ func (r *SongRepository) Create(title, artistJSON string, baseChord *string, bpm
 		plain := utils.ExtractPlainLyrics(*lyrics)
 		plainLyrics = &plain
 	}
-	
+
 	var id int
 	err := r.db.QueryRow(r.db.Rebind(`INSERT INTO songs (slug,title,artist,base_chord,bpm,lyrics_and_chords,plain_lyrics,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),NOW()) RETURNING id`), baseSlug, title, artistJSON, baseChord, bpm, lyrics, plainLyrics, externalLinks, dmcaTakedown, dmcaStatusNotes).Scan(&id)
 	if err != nil {
@@ -193,12 +193,12 @@ func (r *SongRepository) ListAllChordPro() ([]models.Song, error) {
 
 // ── Song Requests ─────────────────────────────────────────────────────────────
 
-func (r *SongRepository) CreateSongRequest(userID int, songTitle, referenceLink string) (*models.SongRequest, error) {
+func (r *SongRepository) CreateSongRequest(userID int, songTitle, referenceLink, lyricsType, lyrics string) (*models.SongRequest, error) {
 	req := &models.SongRequest{}
 	err := r.db.QueryRowx(
-		`INSERT INTO song_requests (user_id, song_title, reference_link) VALUES ($1, $2, $3)
-		 RETURNING id, user_id, song_title, reference_link, status, admin_notes, "createdAt", "updatedAt"`,
-		userID, songTitle, referenceLink,
+		`INSERT INTO song_requests (user_id, song_title, reference_link, lyrics_type, lyrics) VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, user_id, song_title, reference_link, lyrics_type, lyrics, status, admin_notes, "createdAt", "updatedAt"`,
+		userID, songTitle, referenceLink, lyricsType, lyrics,
 	).StructScan(req)
 	return req, err
 }
@@ -221,7 +221,7 @@ func (r *SongRepository) ListSongRequests(status string, page, limit int) ([]mod
 
 	dbRows := []models.SongRequestRow{}
 	args = append(args, limit, offset)
-	q := r.db.Rebind(`SELECT id, user_id, song_title, reference_link, status, admin_notes, "createdAt", "updatedAt"
+	q := r.db.Rebind(`SELECT id, user_id, song_title, reference_link, lyrics_type, lyrics, status, admin_notes, "createdAt", "updatedAt"
 		FROM song_requests WHERE ` + where + ` ORDER BY "createdAt" DESC LIMIT ? OFFSET ?`)
 	if err := r.db.Select(&dbRows, q, args...); err != nil {
 		return nil, 0, err
@@ -245,7 +245,7 @@ func (r *SongRepository) UpdateSongRequestStatus(id int, status, adminNotes stri
 func (r *SongRepository) GetSongRequestByID(id int) (*models.SongRequest, bool, error) {
 	dbRow := &models.SongRequestRow{}
 	err := r.db.QueryRowx(
-		`SELECT id, user_id, song_title, reference_link, status, admin_notes, "createdAt", "updatedAt" FROM song_requests WHERE id = $1`,
+		`SELECT id, user_id, song_title, reference_link, lyrics_type, lyrics, status, admin_notes, "createdAt", "updatedAt" FROM song_requests WHERE id = $1`,
 		id,
 	).StructScan(dbRow)
 	if err == sql.ErrNoRows {
@@ -265,7 +265,7 @@ func (r *SongRepository) ListUserSongRequests(userID, page, limit int) ([]models
 	}
 	dbRows := []models.SongRequestRow{}
 	err := r.db.Select(&dbRows,
-		`SELECT id, user_id, song_title, reference_link, status, admin_notes, "createdAt", "updatedAt"
+		`SELECT id, user_id, song_title, reference_link, lyrics_type, lyrics, status, admin_notes, "createdAt", "updatedAt"
 		 FROM song_requests WHERE user_id = $1 ORDER BY "createdAt" DESC LIMIT $2 OFFSET $3`,
 		userID, limit, offset,
 	)

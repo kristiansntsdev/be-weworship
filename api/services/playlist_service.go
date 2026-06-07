@@ -479,6 +479,7 @@ func (s *PlaylistService) GetPreview(shareToken string) (map[string]any, int, er
 		"playlist_name": p.Name,
 		"owner_name":    p.OwnerName,
 		"song_count":    songCount,
+		"member_count":  p.MemberCount,
 	}, 200, nil
 }
 

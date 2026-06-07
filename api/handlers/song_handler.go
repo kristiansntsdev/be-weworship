@@ -264,6 +264,8 @@ func (h *Handler) RequestSong(c *fiber.Ctx) error {
 	var req struct {
 		SongTitle     string `json:"song_title"`
 		ReferenceLink string `json:"reference_link"`
+		LyricsType    string `json:"lyrics_type"`
+		Lyrics        string `json:"lyrics"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Fail(c, 400, "Invalid JSON")
@@ -272,9 +274,10 @@ func (h *Handler) RequestSong(c *fiber.Ctx) error {
 	if cl == nil {
 		return utils.Fail(c, 401, "Unauthorized")
 	}
-	result, err := h.songs.RequestSong(cl.UserID, req.SongTitle, req.ReferenceLink)
+	result, err := h.songs.RequestSong(cl.UserID, req.SongTitle, req.ReferenceLink, req.LyricsType, req.Lyrics)
 	if err != nil {
-		if err.Error() == "song_title is required" || err.Error() == "reference_link is required" {
+		switch err.Error() {
+		case "song_title is required", "lyrics or reference_link is required", "invalid lyrics_type: must be lyrics or lyrics_chords":
 			return utils.Fail(c, 400, err.Error())
 		}
 		return utils.FailErr(c, 500, "Failed to submit song request", err)

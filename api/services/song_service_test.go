@@ -134,27 +134,49 @@ func TestSongService_Delete_NotFound(t *testing.T) {
 
 func TestSongService_RequestSong_Success(t *testing.T) {
 	mockSongs := &mocks.SongRepo{
-		CreateSongRequestFn: func(userID int, title, refLink string) (*models.SongRequest, error) {
-			return &models.SongRequest{ID: 1, UserID: userID, SongTitle: title, ReferenceLink: refLink}, nil
+		CreateSongRequestFn: func(userID int, title, refLink, lyricsType, lyrics string) (*models.SongRequest, error) {
+			return &models.SongRequest{ID: 1, UserID: userID, SongTitle: title, ReferenceLink: refLink, LyricsType: lyricsType, Lyrics: lyrics}, nil
 		},
 	}
 	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
-	req, err := svc.RequestSong(5, "Amazing Grace", "https://youtube.com/xyz")
+	req, err := svc.RequestSong(5, "Amazing Grace", "https://youtube.com/xyz", "lyrics_chords", "[G]Amazing grace")
 
 	require.NoError(t, err)
 	assert.Equal(t, "Amazing Grace", req.SongTitle)
 	assert.Equal(t, 5, req.UserID)
+	assert.Equal(t, "lyrics_chords", req.LyricsType)
+	assert.Equal(t, "[G]Amazing grace", req.Lyrics)
 }
 
 func TestSongService_RequestSong_EmptyTitle(t *testing.T) {
 	svc := &SongService{songs: &mocks.SongRepo{}, tags: &mocks.TagRepo{}}
-	_, err := svc.RequestSong(1, "   ", "https://youtube.com/xyz")
+	_, err := svc.RequestSong(1, "   ", "https://youtube.com/xyz", "lyrics", "Some lyrics")
 	assert.Error(t, err)
 }
 
-func TestSongService_RequestSong_EmptyReferenceLink(t *testing.T) {
+func TestSongService_RequestSong_EmptyReferenceLinkWithLyrics(t *testing.T) {
+	mockSongs := &mocks.SongRepo{
+		CreateSongRequestFn: func(userID int, title, refLink, lyricsType, lyrics string) (*models.SongRequest, error) {
+			return &models.SongRequest{ID: 1, UserID: userID, SongTitle: title, ReferenceLink: refLink, LyricsType: lyricsType, Lyrics: lyrics}, nil
+		},
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+	req, err := svc.RequestSong(1, "Some Song", "", "lyrics", "Plain lyrics")
+
+	require.NoError(t, err)
+	assert.Empty(t, req.ReferenceLink)
+	assert.Equal(t, "lyrics", req.LyricsType)
+}
+
+func TestSongService_RequestSong_EmptyReferenceLinkAndLyrics(t *testing.T) {
 	svc := &SongService{songs: &mocks.SongRepo{}, tags: &mocks.TagRepo{}}
-	_, err := svc.RequestSong(1, "Some Song", "")
+	_, err := svc.RequestSong(1, "Some Song", "", "lyrics", "")
+	assert.Error(t, err)
+}
+
+func TestSongService_RequestSong_InvalidLyricsType(t *testing.T) {
+	svc := &SongService{songs: &mocks.SongRepo{}, tags: &mocks.TagRepo{}}
+	_, err := svc.RequestSong(1, "Some Song", "", "tabs", "Some lyrics")
 	assert.Error(t, err)
 }
 
