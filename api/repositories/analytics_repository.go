@@ -1,96 +1,98 @@
 package repositories
 
 import (
-"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx"
 )
 
 type AnalyticsRepository struct {
-db *sqlx.DB
+	db *sqlx.DB
 }
 
 func NewAnalyticsRepository(db *sqlx.DB) *AnalyticsRepository {
-return &AnalyticsRepository{db: db}
+	return &AnalyticsRepository{db: db}
 }
 
-// ── Write Methods (fire-and-forget, errors are logged not returned) ───────────
+// ── Write Methods ────────────────────────────────────────────────────────────
 
 func (r *AnalyticsRepository) RecordSongEvent(songID, userID *int, eventType, platform string, durationMs *int) {
-r.db.Exec(r.db.Rebind(`INSERT INTO song_events (song_id,user_id,event_type,platform,duration_ms) VALUES (?,?,?,?,?)`),
-songID, userID, eventType, platform, durationMs)
+	r.db.Exec(r.db.Rebind(`INSERT INTO song_events (song_id,user_id,event_type,platform,duration_ms) VALUES (?,?,?,?,?)`),
+		songID, userID, eventType, platform, durationMs)
 }
 
 func (r *AnalyticsRepository) RecordSearchLog(userID *int, query string, filtersJSON *string, resultsCount int, platform string) {
-r.db.Exec(r.db.Rebind(`INSERT INTO search_logs (user_id,query,filters,results_count,platform) VALUES (?,?,?,?,?)`),
-userID, query, filtersJSON, resultsCount, platform)
+	r.db.Exec(r.db.Rebind(`INSERT INTO search_logs (user_id,query,filters,results_count,platform) VALUES (?,?,?,?,?)`),
+		userID, query, filtersJSON, resultsCount, platform)
 }
 
-func (r *AnalyticsRepository) RecordSession(userID *int, platform, appVersion, deviceOS string) {
-r.db.Exec(r.db.Rebind(`INSERT INTO app_sessions (user_id,platform,app_version,device_os) VALUES (?,?,?,?)`),
-userID, platform, nullStr(appVersion), nullStr(deviceOS))
+func (r *AnalyticsRepository) RecordSession(userID *int, platform, appVersion, deviceOS string) error {
+	_, err := r.db.Exec(r.db.Rebind(`INSERT INTO app_sessions (user_id,platform,app_version,device_os) VALUES (?,?,?,?)`),
+		userID, platform, nullStr(appVersion), nullStr(deviceOS))
+	return err
 }
 
-func (r *AnalyticsRepository) RecordPerformance(userID *int, platform, metricType string, endpoint, screenName *string, durationMs, statusCode *int, appVersion, deviceOS string) {
-r.db.Exec(r.db.Rebind(`INSERT INTO performance_logs (user_id,platform,metric_type,endpoint,screen_name,duration_ms,status_code,app_version,device_os) VALUES (?,?,?,?,?,?,?,?,?)`),
-userID, platform, metricType, endpoint, screenName, durationMs, statusCode, nullStr(appVersion), nullStr(deviceOS))
+func (r *AnalyticsRepository) RecordPerformance(userID *int, platform, metricType string, endpoint, screenName *string, durationMs, statusCode *int, appVersion, deviceOS string) error {
+	_, err := r.db.Exec(r.db.Rebind(`INSERT INTO performance_logs (user_id,platform,metric_type,endpoint,screen_name,duration_ms,status_code,app_version,device_os) VALUES (?,?,?,?,?,?,?,?,?)`),
+		userID, platform, metricType, endpoint, screenName, durationMs, statusCode, nullStr(appVersion), nullStr(deviceOS))
+	return err
 }
 
 // ── Read Aggregates ──────────────────────────────────────────────────────────
 
 type TopSongRow struct {
-SongID    *int   `db:"song_id"`
-EventType string `db:"event_type"`
-Count     int    `db:"count"`
+	SongID    *int   `db:"song_id"`
+	EventType string `db:"event_type"`
+	Count     int    `db:"count"`
 }
 
 func (r *AnalyticsRepository) TopSongs(days int, limit int) ([]TopSongRow, error) {
-rows := []TopSongRow{}
-err := r.db.Select(&rows, r.db.Rebind(`
+	rows := []TopSongRow{}
+	err := r.db.Select(&rows, r.db.Rebind(`
 SELECT song_id, event_type, COUNT(*) as count
 FROM song_events
 WHERE song_id IS NOT NULL AND "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY song_id, event_type
 ORDER BY count DESC
 LIMIT ?`), days, limit)
-return rows, err
+	return rows, err
 }
 
 type DailyCountRow struct {
-Date  string `db:"date"`
-Count int    `db:"count"`
+	Date  string `db:"date"`
+	Count int    `db:"count"`
 }
 
 func (r *AnalyticsRepository) NewUsersPerDay(days int) ([]DailyCountRow, error) {
-rows := []DailyCountRow{}
-err := r.db.Select(&rows, r.db.Rebind(`
+	rows := []DailyCountRow{}
+	err := r.db.Select(&rows, r.db.Rebind(`
 SELECT DATE("createdAt")::text as date, COUNT(*) as count
 FROM users
 WHERE "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY DATE("createdAt")
 ORDER BY date ASC`), days)
-return rows, err
+	return rows, err
 }
 
 func (r *AnalyticsRepository) DAU(days int) ([]DailyCountRow, error) {
-rows := []DailyCountRow{}
-err := r.db.Select(&rows, r.db.Rebind(`
+	rows := []DailyCountRow{}
+	err := r.db.Select(&rows, r.db.Rebind(`
 SELECT DATE("createdAt")::text as date, COUNT(DISTINCT user_id) as count
 FROM app_sessions
 WHERE user_id IS NOT NULL AND "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY DATE("createdAt")
 ORDER BY date ASC`), days)
-return rows, err
+	return rows, err
 }
 
 type TopSearchRow struct {
-Query        string `db:"query"`
-Count        int    `db:"count"`
-AvgResults   int    `db:"avg_results"`
-ZeroResults  int    `db:"zero_results"`
+	Query       string `db:"query"`
+	Count       int    `db:"count"`
+	AvgResults  int    `db:"avg_results"`
+	ZeroResults int    `db:"zero_results"`
 }
 
 func (r *AnalyticsRepository) TopSearches(days, limit int) ([]TopSearchRow, error) {
-rows := []TopSearchRow{}
-err := r.db.Select(&rows, r.db.Rebind(`
+	rows := []TopSearchRow{}
+	err := r.db.Select(&rows, r.db.Rebind(`
 SELECT query,
        COUNT(*) as count,
        ROUND(AVG(results_count))::int as avg_results,
@@ -100,71 +102,74 @@ WHERE "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY query
 ORDER BY count DESC
 LIMIT ?`), days, limit)
-return rows, err
+	return rows, err
 }
 
 type PlatformBreakdownRow struct {
-Platform string `db:"platform"`
-Count    int    `db:"count"`
+	Date     string `db:"date" json:"date"`
+	Platform string `db:"platform" json:"platform"`
+	Count    int    `db:"count" json:"count"`
 }
 
 func (r *AnalyticsRepository) SessionsByPlatform(days int) ([]PlatformBreakdownRow, error) {
-rows := []PlatformBreakdownRow{}
-err := r.db.Select(&rows, r.db.Rebind(`
-SELECT platform, COUNT(*) as count
+	rows := []PlatformBreakdownRow{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+SELECT DATE("createdAt")::text as date, platform, COUNT(*) as count
 FROM app_sessions
 WHERE "createdAt" >= NOW() - ? * INTERVAL '1 day'
-GROUP BY platform
-ORDER BY count DESC`), days)
-return rows, err
+GROUP BY DATE("createdAt"), platform
+ORDER BY date ASC, platform ASC`), days)
+	return rows, err
 }
 
 type PerfSummaryRow struct {
-MetricType string  `db:"metric_type"`
-Endpoint   *string `db:"endpoint"`
-ScreenName *string `db:"screen_name"`
-P50        int     `db:"p50"`
-P95        int     `db:"p95"`
-Avg        int     `db:"avg"`
-Count      int     `db:"count"`
+	MetricType    string  `db:"metric_type" json:"metric_type"`
+	Endpoint      *string `db:"endpoint" json:"endpoint"`
+	ScreenName    *string `db:"screen_name" json:"screen_name"`
+	P50Ms         int     `db:"p50_ms" json:"p50_ms"`
+	P95Ms         int     `db:"p95_ms" json:"p95_ms"`
+	AvgMs         int     `db:"avg_ms" json:"avg_ms"`
+	TotalRequests int     `db:"total_requests" json:"total_requests"`
 }
 
 func (r *AnalyticsRepository) PerformanceSummary(days int) ([]PerfSummaryRow, error) {
-rows := []PerfSummaryRow{}
-err := r.db.Select(&rows, r.db.Rebind(`
-SELECT metric_type, endpoint, screen_name,
-       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY duration_ms)::int as p50,
-       PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms)::int as p95,
-       ROUND(AVG(duration_ms))::int as avg,
-       COUNT(*) as count
+	rows := []PerfSummaryRow{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+SELECT metric_type,
+       COALESCE(endpoint, screen_name, metric_type) as endpoint,
+       screen_name,
+       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY duration_ms)::int as p50_ms,
+       PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms)::int as p95_ms,
+       ROUND(AVG(duration_ms))::int as avg_ms,
+       COUNT(*) as total_requests
 FROM performance_logs
 WHERE "createdAt" >= NOW() - ? * INTERVAL '1 day'
 GROUP BY metric_type, endpoint, screen_name
-ORDER BY p95 DESC`), days)
-return rows, err
+ORDER BY p95_ms DESC`), days)
+	return rows, err
 }
 
 func (r *AnalyticsRepository) TotalUsers() (int, error) {
-var count int
-err := r.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count)
-return count, err
+	var count int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count)
+	return count, err
 }
 
 func (r *AnalyticsRepository) DAUToday() (int, error) {
-var count int
-err := r.db.QueryRow(`SELECT COUNT(DISTINCT user_id) FROM app_sessions WHERE user_id IS NOT NULL AND DATE("createdAt") = CURRENT_DATE`).Scan(&count)
-return count, err
+	var count int
+	err := r.db.QueryRow(`SELECT COUNT(DISTINCT user_id) FROM app_sessions WHERE user_id IS NOT NULL AND DATE("createdAt") = CURRENT_DATE`).Scan(&count)
+	return count, err
 }
 
 func (r *AnalyticsRepository) MAU() (int, error) {
-var count int
-err := r.db.QueryRow(r.db.Rebind(`SELECT COUNT(DISTINCT user_id) FROM app_sessions WHERE user_id IS NOT NULL AND "createdAt" >= NOW() - 30 * INTERVAL '1 day'`)).Scan(&count)
-return count, err
+	var count int
+	err := r.db.QueryRow(r.db.Rebind(`SELECT COUNT(DISTINCT user_id) FROM app_sessions WHERE user_id IS NOT NULL AND "createdAt" >= NOW() - 30 * INTERVAL '1 day'`)).Scan(&count)
+	return count, err
 }
 
 func nullStr(s string) *string {
-if s == "" {
-return nil
-}
-return &s
+	if s == "" {
+		return nil
+	}
+	return &s
 }

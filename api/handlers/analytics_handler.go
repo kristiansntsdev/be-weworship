@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strings"
+
 	"be-songbanks-v1/api/middleware"
 	"be-songbanks-v1/api/utils"
 	"github.com/gofiber/fiber/v2"
@@ -60,15 +62,21 @@ func (h *Handler) GetAnalyticsPerformance(c *fiber.Ctx) error {
 func (h *Handler) RecordPerformance(c *fiber.Ctx) error {
 	var req struct {
 		MetricType string  `json:"metric_type"`
+		Endpoint   *string `json:"endpoint"`
 		ScreenName *string `json:"screen_name"`
 		DurationMs int     `json:"duration_ms"`
+		StatusCode *int    `json:"status_code"`
 		Platform   string  `json:"platform"`
 		AppVersion string  `json:"app_version"`
 		DeviceOS   string  `json:"device_os"`
 	}
-	if err := c.BodyParser(&req); err != nil || req.MetricType == "" || req.DurationMs <= 0 {
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.MetricType) == "" || req.DurationMs <= 0 {
 		return utils.Fail(c, 400, "metric_type and duration_ms are required")
 	}
+	req.MetricType = strings.TrimSpace(req.MetricType)
+	req.Endpoint = normalizeOptionalString(req.Endpoint)
+	req.ScreenName = normalizeOptionalString(req.ScreenName)
+	req.Platform = normalizeAnalyticsPlatform(req.Platform)
 
 	cl := middleware.GetClaims(c)
 	var userID *int
@@ -77,7 +85,9 @@ func (h *Handler) RecordPerformance(c *fiber.Ctx) error {
 		userID = &id
 	}
 
-	h.analytics.RecordPerformance(userID, req.Platform, req.MetricType, nil, req.ScreenName, &req.DurationMs, nil, req.AppVersion, req.DeviceOS)
+	if err := h.analytics.RecordPerformance(userID, req.Platform, req.MetricType, req.Endpoint, req.ScreenName, &req.DurationMs, req.StatusCode, req.AppVersion, req.DeviceOS); err != nil {
+		return utils.FailErr(c, 500, "Failed to record performance", err)
+	}
 	return utils.OK(c, 200, "Performance recorded", nil)
 }
 
@@ -97,6 +107,28 @@ func (h *Handler) RecordSession(c *fiber.Ctx) error {
 		id := cl.UserID
 		userID = &id
 	}
-	h.analytics.RecordSession(userID, req.Platform, req.AppVersion, req.DeviceOS)
+	req.Platform = normalizeAnalyticsPlatform(req.Platform)
+	if err := h.analytics.RecordSession(userID, req.Platform, req.AppVersion, req.DeviceOS); err != nil {
+		return utils.FailErr(c, 500, "Failed to record session", err)
+	}
 	return utils.OK(c, 200, "Session recorded", nil)
+}
+
+func normalizeAnalyticsPlatform(platform string) string {
+	platform = strings.TrimSpace(platform)
+	if platform == "" {
+		return "unknown"
+	}
+	return platform
+}
+
+func normalizeOptionalString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }

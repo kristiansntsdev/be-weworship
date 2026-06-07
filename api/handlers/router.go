@@ -57,8 +57,8 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Post("/tags/get-or-create", h.GetOrCreateTag)
 
 	// ── Analytics write (optionally authenticated) ─────────────────────────
-	api.Post("/analytics/performance", h.RecordPerformance)
-	api.Post("/analytics/session", h.RecordSession)
+	api.Post("/analytics/performance", h.authMW.OptionalAuth, h.RecordPerformance)
+	api.Post("/analytics/session", h.authMW.OptionalAuth, h.RecordSession)
 
 	// ── Auth-required routes ───────────────────────────────────────────────
 	// NOTE: Do NOT use api.Group("", middleware) — in Fiber v2, an empty-prefix

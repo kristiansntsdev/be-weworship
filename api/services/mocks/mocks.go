@@ -653,8 +653,8 @@ func (m *NotificationRepo) CountUnread(userID int) (int, error) {
 type AnalyticsRepo struct {
 	RecordSongEventFn    func(*int, *int, string, string, *int)
 	RecordSearchLogFn    func(*int, string, *string, int, string)
-	RecordSessionFn      func(*int, string, string, string)
-	RecordPerformanceFn  func(*int, string, string, *string, *string, *int, *int, string, string)
+	RecordSessionFn      func(*int, string, string, string) error
+	RecordPerformanceFn  func(*int, string, string, *string, *string, *int, *int, string, string) error
 	TopSongsFn           func(int, int) ([]repositories.TopSongRow, error)
 	NewUsersPerDayFn     func(int) ([]repositories.DailyCountRow, error)
 	DAUFn                func(int) ([]repositories.DailyCountRow, error)
@@ -676,15 +676,17 @@ func (m *AnalyticsRepo) RecordSearchLog(userID *int, query string, filtersJSON *
 		m.RecordSearchLogFn(userID, query, filtersJSON, resultsCount, platform)
 	}
 }
-func (m *AnalyticsRepo) RecordSession(userID *int, platform, appVersion, deviceOS string) {
+func (m *AnalyticsRepo) RecordSession(userID *int, platform, appVersion, deviceOS string) error {
 	if m.RecordSessionFn != nil {
-		m.RecordSessionFn(userID, platform, appVersion, deviceOS)
+		return m.RecordSessionFn(userID, platform, appVersion, deviceOS)
 	}
+	return nil
 }
-func (m *AnalyticsRepo) RecordPerformance(userID *int, platform, metricType string, endpoint, screenName *string, durationMs, statusCode *int, appVersion, deviceOS string) {
+func (m *AnalyticsRepo) RecordPerformance(userID *int, platform, metricType string, endpoint, screenName *string, durationMs, statusCode *int, appVersion, deviceOS string) error {
 	if m.RecordPerformanceFn != nil {
-		m.RecordPerformanceFn(userID, platform, metricType, endpoint, screenName, durationMs, statusCode, appVersion, deviceOS)
+		return m.RecordPerformanceFn(userID, platform, metricType, endpoint, screenName, durationMs, statusCode, appVersion, deviceOS)
 	}
+	return nil
 }
 func (m *AnalyticsRepo) TopSongs(days, limit int) ([]repositories.TopSongRow, error) {
 	if m.TopSongsFn != nil {

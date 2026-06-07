@@ -119,6 +119,70 @@ func TestAnalyticsService_RecordSearch_NilFilters(t *testing.T) {
 	assert.Nil(t, receivedJSON, "nil filters map must produce nil JSON")
 }
 
+func TestAnalyticsService_RecordSession_ReturnsRepoError(t *testing.T) {
+	expectedErr := fmt.Errorf("insert failed")
+	mockRepo := &mocks.AnalyticsRepo{
+		RecordSessionFn: func(*int, string, string, string) error {
+			return expectedErr
+		},
+	}
+	svc := &AnalyticsService{repo: mockRepo}
+
+	err := svc.RecordSession(nil, "ios", "1.0.0", "iOS 18")
+
+	assert.ErrorIs(t, err, expectedErr)
+}
+
+func TestAnalyticsService_RecordPerformance_ForwardsPayload(t *testing.T) {
+	userID := 7
+	endpoint := "/api/songs/export"
+	screenName := "library"
+	durationMs := 120
+	statusCode := 200
+	called := false
+	mockRepo := &mocks.AnalyticsRepo{
+		RecordPerformanceFn: func(receivedUserID *int, platform, metricType string, receivedEndpoint, receivedScreenName *string, receivedDurationMs, receivedStatusCode *int, appVersion, deviceOS string) error {
+			called = true
+			require.NotNil(t, receivedUserID)
+			assert.Equal(t, userID, *receivedUserID)
+			assert.Equal(t, "android", platform)
+			assert.Equal(t, "api_response", metricType)
+			require.NotNil(t, receivedEndpoint)
+			assert.Equal(t, endpoint, *receivedEndpoint)
+			require.NotNil(t, receivedScreenName)
+			assert.Equal(t, screenName, *receivedScreenName)
+			require.NotNil(t, receivedDurationMs)
+			assert.Equal(t, durationMs, *receivedDurationMs)
+			require.NotNil(t, receivedStatusCode)
+			assert.Equal(t, statusCode, *receivedStatusCode)
+			assert.Equal(t, "1.0.0", appVersion)
+			assert.Equal(t, "Android 15", deviceOS)
+			return nil
+		},
+	}
+	svc := &AnalyticsService{repo: mockRepo}
+
+	err := svc.RecordPerformance(&userID, "android", "api_response", &endpoint, &screenName, &durationMs, &statusCode, "1.0.0", "Android 15")
+
+	require.NoError(t, err)
+	assert.True(t, called)
+}
+
+func TestAnalyticsService_RecordPerformance_ReturnsRepoError(t *testing.T) {
+	expectedErr := fmt.Errorf("insert failed")
+	durationMs := 100
+	mockRepo := &mocks.AnalyticsRepo{
+		RecordPerformanceFn: func(*int, string, string, *string, *string, *int, *int, string, string) error {
+			return expectedErr
+		},
+	}
+	svc := &AnalyticsService{repo: mockRepo}
+
+	err := svc.RecordPerformance(nil, "ios", "screen_load", nil, nil, &durationMs, nil, "1.0.0", "iOS 18")
+
+	assert.ErrorIs(t, err, expectedErr)
+}
+
 // ── TopSearches ───────────────────────────────────────────────────────────────
 
 func TestAnalyticsService_TopSearches_Success(t *testing.T) {
