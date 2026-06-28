@@ -109,21 +109,32 @@ return "", err
 }
 
 if state == "mobile" || strings.HasPrefix(state, "mobile|") {
-if strings.HasPrefix(state, "mobile|") {
-// Expo Go passes its own redirect URI (exp://...) encoded after the pipe
-redirectURI := strings.TrimPrefix(state, "mobile|")
-return redirectURI + "?token=" + token, nil
-}
-scheme := s.google.MobileScheme
-if scheme == "" {
-scheme = "weworship"
-}
-return scheme + "://auth/callback?token=" + token, nil
+	if strings.HasPrefix(state, "mobile|") {
+		// Expo Go passes its own redirect URI (exp://...) encoded after the pipe
+		redirectURI := strings.TrimPrefix(state, "mobile|")
+		return appendTokenQuery(redirectURI, token), nil
+	}
+	scheme := s.google.MobileScheme
+	if scheme == "" {
+		scheme = "weworship"
+	}
+	return appendTokenQuery(scheme+"://auth/callback", token), nil
 }
 if s.google.ClientURL != "" {
-return s.google.ClientURL + "/auth/callback?token=" + token, nil
+	return appendTokenQuery(s.google.ClientURL+"/auth/callback", token), nil
 }
-return "/?token=" + token, nil
+return appendTokenQuery("/", token), nil
+}
+
+func appendTokenQuery(redirectURI, token string) string {
+	u, err := url.Parse(redirectURI)
+	if err != nil {
+		return redirectURI + "?token=" + url.QueryEscape(token)
+	}
+	q := u.Query()
+	q.Set("token", token)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // GoogleLoginErrorURL returns the login page URL with an error query param.
