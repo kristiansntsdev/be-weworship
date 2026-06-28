@@ -4,23 +4,37 @@ import (
 	"be-songbanks-v1/api/models"
 	"be-songbanks-v1/api/platform"
 	"be-songbanks-v1/api/repositories"
+	"be-songbanks-v1/api/types"
 	"be-songbanks-v1/api/utils"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 )
 
 type PlaylistService struct {
-	playlists repositories.PlaylistRepoIface
-	teams     repositories.TeamRepoIface
-	songs     repositories.SongRepoIface
-	clientURL string
-	live      platform.LiveCacheIface
+	playlists            repositories.PlaylistRepoIface
+	teams                repositories.TeamRepoIface
+	songs                repositories.SongRepoIface
+	clientURL            string
+	live                 platform.LiveCacheIface
+	auth                 *AuthService
+	realtimeWSURL        string
+	realtimeInternalURL  string
 }
 
-func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.TeamRepository, s *repositories.SongRepository, clientURL string, live *platform.LiveCache) *PlaylistService {
-	return &PlaylistService{playlists: p, teams: t, songs: s, clientURL: clientURL, live: live}
+func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.TeamRepository, s *repositories.SongRepository, clientURL string, live *platform.LiveCache, auth *AuthService, realtimeWSURL, realtimeInternalURL string) *PlaylistService {
+	return &PlaylistService{
+		playlists:           p,
+		teams:               t,
+		songs:               s,
+		clientURL:           clientURL,
+		live:                live,
+		auth:                auth,
+		realtimeWSURL:       strings.TrimSpace(realtimeWSURL),
+		realtimeInternalURL: strings.TrimRight(strings.TrimSpace(realtimeInternalURL), "/"),
+	}
 }
 
 func (s *PlaylistService) Create(userID int, name string, songs []int) (map[string]any, int, error) {
@@ -373,37 +387,142 @@ func (s *PlaylistService) loadWithAccess(playlistID, userID int) (*models.Playli
 
 // ── Live Session ──────────────────────────────────────────────────────────────
 
-func (s *PlaylistService) StartLive(playlistID, userID int) error {
+type LivePermissions struct {
+	MemberRole       string
+	CanStartLive     bool
+	CanPublishScreen bool
+	CanPublishAudio  bool
+}
+
+func (s *PlaylistService) ResolveLivePermissions(playlistID, userID int) (LivePermissions, error) {
+	perms := LivePermissions{MemberRole: s.GetViewerRole(playlistID, userID)}
+	if userID == 0 {
+		return perms, nil
+	}
+	isWL, err := s.canBroadcastLive(playlistID, userID)
+	if err != nil {
+		return perms, err
+	}
+	isMD := perms.MemberRole == "md"
+	perms.CanStartLive = isWL || isMD
+	perms.CanPublishScreen = isWL || isMD
+	perms.CanPublishAudio = isMD
+	return perms, nil
+}
+
+func (s *PlaylistService) StartLive(playlistID, userID int, username string) (map[string]any, error) {
 	if s.live == nil {
-		return fmt.Errorf("live sessions unavailable")
+		return nil, fmt.Errorf("live sessions unavailable")
 	}
-	ok, err := s.canBroadcastLive(playlistID, userID)
-	if err != nil || !ok {
-		return fmt.Errorf("access denied")
+	perms, err := s.ResolveLivePermissions(playlistID, userID)
+	if err != nil {
+		return nil, err
 	}
-	return s.live.StartSession(playlistID, userID)
+	if !perms.CanStartLive {
+		return nil, fmt.Errorf("access denied")
+	}
+	if err := s.live.StartSession(playlistID, userID); err != nil {
+		return nil, err
+	}
+	return s.buildLiveBootstrap(playlistID, userID, username, perms)
 }
 
 func (s *PlaylistService) EndLive(playlistID, userID int) error {
 	if s.live == nil {
 		return nil
 	}
-	ok, err := s.canBroadcastLive(playlistID, userID)
-	if err != nil || !ok {
+	perms, err := s.ResolveLivePermissions(playlistID, userID)
+	if err != nil {
+		return err
+	}
+	if !perms.CanStartLive {
 		return fmt.Errorf("access denied")
 	}
-	return s.live.EndSession(playlistID)
+	if err := s.live.EndSession(playlistID); err != nil {
+		return err
+	}
+	s.notifyRealtimeEnded(playlistID)
+	return nil
 }
 
 func (s *PlaylistService) UpdateLiveState(playlistID, userID, songIndex int, scrollRatio float64) error {
 	if s.live == nil {
 		return fmt.Errorf("live sessions unavailable")
 	}
-	ok, err := s.canBroadcastLive(playlistID, userID)
-	if err != nil || !ok {
+	perms, err := s.ResolveLivePermissions(playlistID, userID)
+	if err != nil {
+		return err
+	}
+	if !perms.CanPublishScreen {
 		return fmt.Errorf("access denied")
 	}
 	return s.live.UpdateState(playlistID, songIndex, scrollRatio)
+}
+
+func (s *PlaylistService) GetLiveWsToken(playlistID, userID int, username string) (map[string]any, error) {
+	if s.live == nil {
+		return nil, fmt.Errorf("live sessions unavailable")
+	}
+	state, err := s.live.GetState(playlistID)
+	if err != nil {
+		return nil, err
+	}
+	if state == nil || !state.IsActive {
+		return nil, fmt.Errorf("no active live session")
+	}
+	perms, err := s.ResolveLivePermissions(playlistID, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.issueWsBootstrap(playlistID, userID, username, perms)
+}
+
+func (s *PlaylistService) buildLiveBootstrap(playlistID, userID int, username string, perms LivePermissions) (map[string]any, error) {
+	bootstrap, err := s.issueWsBootstrap(playlistID, userID, username, perms)
+	if err != nil {
+		return nil, err
+	}
+	bootstrap["playlist_id"] = playlistID
+	return bootstrap, nil
+}
+
+func (s *PlaylistService) issueWsBootstrap(playlistID, userID int, username string, perms LivePermissions) (map[string]any, error) {
+	out := map[string]any{
+		"can_publish_screen": perms.CanPublishScreen,
+		"can_publish_audio":  perms.CanPublishAudio,
+		"member_role":        perms.MemberRole,
+	}
+	if s.auth == nil || s.realtimeWSURL == "" {
+		return out, nil
+	}
+	token, err := s.auth.IssueWSToken(types.WSClaims{
+		UserID:           userID,
+		PlaylistID:       playlistID,
+		MemberRole:       perms.MemberRole,
+		Username:         username,
+		CanPublishScreen: perms.CanPublishScreen,
+		CanPublishAudio:  perms.CanPublishAudio,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out["ws_url"] = s.realtimeWSURL
+	out["ws_token"] = token
+	return out, nil
+}
+
+func (s *PlaylistService) notifyRealtimeEnded(playlistID int) {
+	if s.realtimeInternalURL == "" || s.auth == nil {
+		return
+	}
+	url := fmt.Sprintf("%s/internal/live-ended?playlist_id=%d", s.realtimeInternalURL, playlistID)
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("X-Internal-Secret", s.auth.SessionSecret())
+	client := &http.Client{Timeout: 3 * time.Second}
+	_, _ = client.Do(req)
 }
 
 func (s *PlaylistService) GetLiveState(playlistID int) (*platform.LiveState, error) {

@@ -72,7 +72,11 @@ func buildApp() (*fiber.App, error) {
 	})
 	tagSvc := services.NewTagService(tagRepo)
 	songSvc := services.NewSongService(songRepo, tagRepo, playlistRepo, songCache)
-	playlistSvc := services.NewPlaylistService(playlistRepo, teamRepo, songRepo, ctx.ClientURL, liveCache)
+	playlistSvc := services.NewPlaylistService(
+		playlistRepo, teamRepo, songRepo, ctx.ClientURL, liveCache, authSvc,
+		os.Getenv("REALTIME_WS_URL"),
+		os.Getenv("REALTIME_INTERNAL_URL"),
+	)
 	teamSvc := services.NewTeamService(teamRepo, authRepo, playlistRepo)
 	userSvc := services.NewUserService(userRepo)
 	analyticsSvc := services.NewAnalyticsService(analyticsRepo)

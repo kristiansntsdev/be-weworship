@@ -102,6 +102,7 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Delete("/playlists/:id/song/:songId", ra, h.RemoveSongFromPlaylist)
 	// Live session (GET uses OptionalAuth — decode role if token present, guest otherwise)
 	api.Post("/playlists/:id/live", ra, h.StartLiveSession)
+	api.Post("/playlists/:id/live/ws-token", ra, h.GetLiveWsToken)
 	api.Delete("/playlists/:id/live", ra, h.EndLiveSession)
 	api.Put("/playlists/:id/live/state", ra, h.UpdateLiveState)
 	api.Get("/playlists/:id/live", h.authMW.OptionalAuth, h.GetLiveState)

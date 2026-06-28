@@ -242,10 +242,25 @@ func (h *Handler) StartLiveSession(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.Fail(c, 400, "Invalid playlist ID")
 	}
-	if err := h.playlists.StartLive(id, cl.UserID); err != nil {
+	data, err := h.playlists.StartLive(id, cl.UserID, cl.Username)
+	if err != nil {
 		return utils.FailErr(c, 403, err.Error(), err)
 	}
-	return utils.OK(c, 200, "Live session started", fiber.Map{"playlist_id": id})
+	return utils.OK(c, 200, "Live session started", data)
+}
+
+func (h *Handler) GetLiveWsToken(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	data, err := h.playlists.GetLiveWsToken(id, cl.UserID, cl.Username)
+	if err != nil {
+		return utils.FailErr(c, 404, err.Error(), err)
+	}
+	data["playlist_id"] = id
+	return utils.OK(c, 200, "WebSocket token issued", data)
 }
 
 func (h *Handler) EndLiveSession(c *fiber.Ctx) error {

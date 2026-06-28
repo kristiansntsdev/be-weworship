@@ -37,6 +37,10 @@ func NewAuthService(repo *repositories.AuthRepository, jwtSecret []byte, google 
 	return &AuthService{repo: repo, jwtSecret: jwtSecret, google: google}
 }
 
+func (s *AuthService) SessionSecret() string {
+	return string(s.jwtSecret)
+}
+
 // GoogleAuthURL builds the Google consent-screen URL.
 // client is "web" or "mobile".
 func (s *AuthService) GoogleAuthURL(client string) string {
@@ -247,6 +251,28 @@ if !ok {
 return nil, fmt.Errorf("invalid token claims")
 }
 return cl, nil
+}
+
+func (s *AuthService) IssueWSToken(claims types.WSClaims) (string, error) {
+	now := time.Now()
+	claims.IssuedAt = jwt.NewNumericDate(now)
+	claims.ExpiresAt = jwt.NewNumericDate(now.Add(4 * time.Hour))
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return t.SignedString(s.jwtSecret)
+}
+
+func (s *AuthService) ParseWSToken(token string) (*types.WSClaims, error) {
+	parsed, err := jwt.ParseWithClaims(token, &types.WSClaims{}, func(t *jwt.Token) (any, error) {
+		return s.jwtSecret, nil
+	})
+	if err != nil || !parsed.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+	cl, ok := parsed.Claims.(*types.WSClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims")
+	}
+	return cl, nil
 }
 
 func mapUser(u models.User) map[string]any {
