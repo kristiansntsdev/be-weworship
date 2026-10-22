@@ -36,7 +36,32 @@ func (s *UserService) GetDetail(userID int) (*models.UserDetail, error) {
 }
 
 func (s *UserService) UpdateProfile(userID int, fullName, province, city, postalCode *string) error {
-	return s.repo.UpsertDetail(userID, fullName, province, city, postalCode)
+	existing, err := s.repo.GetDetail(userID)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	fn := mergeDetailField(fullName, existing, func(d *models.UserDetail) sql.NullString { return d.FullName })
+	prov := mergeDetailField(province, existing, func(d *models.UserDetail) sql.NullString { return d.Province })
+	cityVal := mergeDetailField(city, existing, func(d *models.UserDetail) sql.NullString { return d.City })
+	postal := mergeDetailField(postalCode, existing, func(d *models.UserDetail) sql.NullString { return d.PostalCode })
+
+	return s.repo.UpsertDetail(userID, fn, prov, cityVal, postal)
+}
+
+func mergeDetailField(in *string, existing *models.UserDetail, getter func(*models.UserDetail) sql.NullString) *string {
+	if in != nil {
+		return in
+	}
+	if existing == nil {
+		return nil
+	}
+	current := getter(existing)
+	if !current.Valid {
+		return nil
+	}
+	value := current.String
+	return &value
 }
 
 func (s *UserService) UpdateAvatarURL(userID int, avatarURL string) error {
