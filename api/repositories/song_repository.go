@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -18,33 +19,161 @@ func NewSongRepository(db *sqlx.DB) *SongRepository {
 	return &SongRepository{db: db}
 }
 
-func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool) ([]models.Song, int, error) {
+// songWordsClause requires every search word to appear in the title, artist, or lyrics
+// (word by word, so HTML/chord markup between words does not break a match). Empty search → "".
+func songWordsClause(search string) (string, []any) {
+	words := strings.Fields(strings.TrimSpace(search))
+	if len(words) == 0 {
+		return "", nil
+	}
+	conds := make([]string, len(words))
+	args := make([]any, 0, len(words)*3)
+	for i, word := range words {
+		conds[i] = `(s.title ILIKE ? ESCAPE '\' OR s.artist ILIKE ? ESCAPE '\' OR COALESCE(s.plain_lyrics, s.lyrics_and_chords) ILIKE ? ESCAPE '\')`
+		like := containsPattern(word)
+		args = append(args, like, like, like)
+	}
+	return "(" + strings.Join(conds, " AND ") + ")", args
+}
+
+func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) ([]models.Song, int, error) {
 	offset := (page - 1) * limit
 	where := []string{"1=1"}
 	args := []any{}
 
-	if strings.TrimSpace(search) != "" {
-		// Split search into words and search for each word (handles HTML/chord markup between words)
-		words := strings.Fields(strings.TrimSpace(search))
-		if len(words) == 1 {
-			// Single word: search in title, artist, or plain_lyrics
-			where = append(where, `(s.title ILIKE ? ESCAPE '\' OR s.artist ILIKE ? ESCAPE '\' OR COALESCE(s.plain_lyrics, s.lyrics_and_chords) ILIKE ? ESCAPE '\')`)
-			like := containsPattern(words[0])
-			args = append(args, like, like, like)
-		} else {
-			// Multiple words: each word must appear somewhere in title, artist, or lyrics
-			wordConditions := make([]string, len(words))
-			for i, word := range words {
-				wordConditions[i] = `(s.title ILIKE ? ESCAPE '\' OR s.artist ILIKE ? ESCAPE '\' OR COALESCE(s.plain_lyrics, s.lyrics_and_chords) ILIKE ? ESCAPE '\')`
-				like := containsPattern(word)
-				args = append(args, like, like, like)
-			}
-			where = append(where, "("+strings.Join(wordConditions, " AND ")+")")
-		}
+	if clause, wordArgs := songWordsClause(search); clause != "" {
+		where = append(where, clause)
+		args = append(args, wordArgs...)
 	}
+	filters, filterArgs := songFilterClauses(baseChord, tagIDs, keys, artists, hasLink, chordPro)
+	where = append(where, filters...)
+	args = append(args, filterArgs...)
+
+	whereClause := strings.Join(where, " AND ")
+	countArgs := append([]any{}, args...)
+	var total int
+	countQ := r.db.Rebind(`SELECT COUNT(DISTINCT s.id) FROM songs s WHERE ` + whereClause)
+	if err := r.db.Get(&total, countQ, countArgs...); err != nil {
+		return nil, 0, err
+	}
+
+	query := r.db.Rebind(`SELECT s.id,s.slug,s.title,s.artist,s.base_chord,s.bpm,s.lyrics_and_chords,s.external_links,s.dmca_takedown,s.dmca_status_notes,s."createdAt",s."updatedAt" FROM songs s WHERE ` + whereClause + ` ORDER BY ` + sortBy + ` ` + sortOrder + `, s.title ASC, s.id ASC LIMIT ? OFFSET ?`)
+	args = append(args, limit, offset)
+	rows := []models.Song{}
+	if err := r.db.Select(&rows, query, args...); err != nil {
+		return nil, 0, err
+	}
+
+	return rows, total, nil
+}
+
+// SearchCandidate is a song matched by a ranked search, with its text-match score.
+type SearchCandidate struct {
+	ID       int     `db:"id"`
+	Title    string  `db:"title"`
+	LexScore float64 `db:"lex_score"`
+	LexMatch bool    `db:"lex_match"`
+	// Strength: 2 = exact title, 1 = a query of 3+ words found verbatim in the title or lyrics, 0 = neither.
+	Strength int `db:"strength"`
+}
+
+// SearchCandidates returns every filtered song that matches the search text — all words present, or a close
+// trigram match on the title or lyrics so typos still hit — plus extraIDs (semantic matches), each with a text
+// score. Not paginated: the service merges this with the semantic ranking and pages the result.
+func (r *SongRepository) SearchCandidates(search string, extraIDs []int, baseChord string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) ([]SearchCandidate, error) {
+	q := strings.TrimSpace(search)
+	wordsClause, wordArgs := songWordsClause(q)
+	if wordsClause == "" {
+		wordsClause = "FALSE"
+	}
+	lyrics := `COALESCE(s.plain_lyrics, s.lyrics_and_chords, '')`
+	phrase := containsPattern(q)
+	prefix := escapeLikePattern(q) + "%"
+
+	// Exact title > title prefix > phrase in title/lyrics > all words present, plus trigram closeness for typos.
+	score := `(CASE WHEN lower(s.title) = lower(?) THEN 4 ELSE 0 END)
+		+ (CASE WHEN s.title ILIKE ? ESCAPE '\' THEN 2 ELSE 0 END)
+		+ (CASE WHEN s.title ILIKE ? ESCAPE '\' THEN 1.5 ELSE 0 END)
+		+ (CASE WHEN ` + lyrics + ` ILIKE ? ESCAPE '\' THEN 1.5 ELSE 0 END)
+		+ (CASE WHEN s.artist ILIKE ? ESCAPE '\' THEN 1 ELSE 0 END)
+		+ (CASE WHEN ` + wordsClause + ` THEN 1 ELSE 0 END)
+		+ 1.5 * word_similarity(?, s.title)
+		+ word_similarity(?, ` + lyrics + `)`
+	// <% = pg_trgm word similarity above pg_trgm.word_similarity_threshold (default 0.6).
+	match := `(` + wordsClause + ` OR ? <% s.title OR ? <% ` + lyrics + `)`
+	strength := `(CASE WHEN lower(s.title) = lower(?) THEN 2
+		WHEN ? AND (s.title ILIKE ? ESCAPE '\' OR ` + lyrics + ` ILIKE ? ESCAPE '\') THEN 1 ELSE 0 END)`
+	phraseQuery := len(strings.Fields(q)) >= 3
+
+	args := []any{q, prefix, phrase, phrase, phrase}
+	args = append(args, wordArgs...)
+	args = append(args, q, q)
+	args = append(args, wordArgs...)
+	args = append(args, q, q)
+	args = append(args, q, phraseQuery, phrase, phrase)
+
+	where := "TRUE"
+	filters, filterArgs := songFilterClauses(baseChord, tagIDs, keys, artists, hasLink, chordPro)
+	if len(filters) > 0 {
+		where = strings.Join(filters, " AND ")
+	}
+	args = append(args, filterArgs...)
+
+	ids := make([]int64, len(extraIDs))
+	for i, id := range extraIDs {
+		ids[i] = int64(id)
+	}
+	args = append(args, ids)
+
+	query := `SELECT id, title, lex_score, lex_match, strength FROM (
+		SELECT s.id, s.title, (` + score + `)::float8 AS lex_score, ` + match + ` AS lex_match, ` + strength + ` AS strength
+		FROM songs s WHERE ` + where + `
+	) c WHERE c.lex_match OR c.id = ANY(?)`
+	rows := []SearchCandidate{}
+	err := r.db.Select(&rows, r.db.Rebind(query), args...)
+	return rows, err
+}
+
+// ListByIDs loads full song rows for the given ids (unordered).
+func (r *SongRepository) ListByIDs(ids []int) ([]models.Song, error) {
+	rows := []models.Song{}
+	if len(ids) == 0 {
+		return rows, nil
+	}
+	ids64 := make([]int64, len(ids))
+	for i, id := range ids {
+		ids64[i] = int64(id)
+	}
+	err := r.db.Select(&rows, r.db.Rebind(`SELECT s.id,s.slug,s.title,s.artist,s.base_chord,s.bpm,s.lyrics_and_chords,s.external_links,s.dmca_takedown,s.dmca_status_notes,s."createdAt",s."updatedAt" FROM songs s WHERE s.id = ANY(?)`), ids64)
+	return rows, err
+}
+
+// songFilterClauses builds the non-search filters shared by List and SearchCandidates.
+func songFilterClauses(baseChord string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) ([]string, []any) {
+	where := []string{}
+	args := []any{}
 	if strings.TrimSpace(baseChord) != "" {
 		where = append(where, `s.base_chord ILIKE ? ESCAPE '\'`)
 		args = append(args, containsPattern(baseChord))
+	}
+	if len(keys) > 0 {
+		// Exact match on any of the given keys (unlike base_chord, where "A" would also match "Am" and "Ab").
+		ph := strings.TrimRight(strings.Repeat("?,", len(keys)), ",")
+		where = append(where, `s.base_chord IN (`+ph+`)`)
+		for _, k := range keys {
+			args = append(args, k)
+		}
+	}
+	if len(artists) > 0 {
+		// artist holds a JSON array. Rows written by Go's json.Marshal store &, <, > as unicode escapes while
+		// imported rows keep them literal, so match the quoted element in both encodings.
+		conds := make([]string, len(artists))
+		for i, a := range artists {
+			conds[i] = `(s.artist ILIKE ? ESCAPE '\' OR s.artist ILIKE ? ESCAPE '\')`
+			escaped, _ := json.Marshal(a)
+			args = append(args, containsPattern(`"`+a+`"`), containsPattern(string(escaped)))
+		}
+		where = append(where, "("+strings.Join(conds, " OR ")+")")
 	}
 	if len(tagIDs) > 0 {
 		ph := strings.TrimRight(strings.Repeat("?,", len(tagIDs)), ",")
@@ -67,23 +196,7 @@ func (r *SongRepository) List(page, limit int, search, baseChord, sortBy, sortOr
 			where = append(where, `(s.lyrics_and_chords IS NULL OR s.lyrics_and_chords NOT LIKE '%[%' OR s.lyrics_and_chords LIKE '%<span%')`)
 		}
 	}
-
-	whereClause := strings.Join(where, " AND ")
-	countArgs := append([]any{}, args...)
-	var total int
-	countQ := r.db.Rebind(`SELECT COUNT(DISTINCT s.id) FROM songs s WHERE ` + whereClause)
-	if err := r.db.Get(&total, countQ, countArgs...); err != nil {
-		return nil, 0, err
-	}
-
-	query := r.db.Rebind(`SELECT s.id,s.slug,s.title,s.artist,s.base_chord,s.bpm,s.lyrics_and_chords,s.external_links,s.dmca_takedown,s.dmca_status_notes,s."createdAt",s."updatedAt" FROM songs s WHERE ` + whereClause + ` ORDER BY ` + sortBy + ` ` + sortOrder + ` LIMIT ? OFFSET ?`)
-	args = append(args, limit, offset)
-	rows := []models.Song{}
-	if err := r.db.Select(&rows, query, args...); err != nil {
-		return nil, 0, err
-	}
-
-	return rows, total, nil
+	return where, args
 }
 
 func (r *SongRepository) GetByID(id int) (*models.Song, error) {
@@ -172,6 +285,25 @@ func (r *SongRepository) ListArtistsRaw() ([]string, error) {
 		WHERE artist IS NOT NULL AND artist != ''
 		  AND (lyrics_and_chords LIKE '%[%' AND lyrics_and_chords NOT LIKE '%<span%')
 		  AND dmca_takedown = false`)
+	return rows, err
+}
+
+// KeyCount is one distinct base_chord and how many visible songs use it.
+type KeyCount struct {
+	Key   string `db:"song_key" json:"key"`
+	Count int    `db:"song_count" json:"count"`
+}
+
+// ListKeyCounts returns the distinct base_chord values of ChordPro songs, for key filters.
+func (r *SongRepository) ListKeyCounts() ([]KeyCount, error) {
+	rows := []KeyCount{}
+	err := r.db.Select(&rows, `
+		SELECT base_chord AS song_key, COUNT(*) AS song_count FROM songs
+		WHERE base_chord IS NOT NULL AND TRIM(base_chord) != ''
+		  AND (lyrics_and_chords LIKE '%[%' AND lyrics_and_chords NOT LIKE '%<span%')
+		  AND dmca_takedown = false
+		GROUP BY base_chord
+		ORDER BY base_chord`)
 	return rows, err
 }
 

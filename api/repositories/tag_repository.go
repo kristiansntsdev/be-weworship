@@ -54,3 +54,27 @@ func (r *TagRepository) GetTagsForSong(songID int) ([]models.Tag, error) {
 	err := r.db.Select(&rows, r.db.Rebind(`SELECT t.id,t.name,t.description FROM tags t JOIN song_tags st ON t.id=st.tag_id WHERE st.song_id=?`), songID)
 	return rows, err
 }
+
+// GetTagsForSongs loads the tags of several songs in one query, keyed by song id. Songs without tags are absent.
+func (r *TagRepository) GetTagsForSongs(songIDs []int) (map[int][]models.Tag, error) {
+	bySong := map[int][]models.Tag{}
+	if len(songIDs) == 0 {
+		return bySong, nil
+	}
+	ids64 := make([]int64, len(songIDs))
+	for i, id := range songIDs {
+		ids64[i] = int64(id)
+	}
+	rows := []struct {
+		SongID int `db:"song_id"`
+		models.Tag
+	}{}
+	err := r.db.Select(&rows, r.db.Rebind(`SELECT st.song_id,t.id,t.name,t.description FROM tags t JOIN song_tags st ON t.id=st.tag_id WHERE st.song_id = ANY(?)`), ids64)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		bySong[row.SongID] = append(bySong[row.SongID], row.Tag)
+	}
+	return bySong, nil
+}

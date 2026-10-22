@@ -63,7 +63,10 @@ func (m *AuthRepo) CreateLocal(name, email, hashedPassword string) (*models.User
 // ── SongRepo ──────────────────────────────────────────────────────────────────
 
 type SongRepo struct {
-	ListFn                    func(int, int, string, string, string, string, []int, *bool, *bool) ([]models.Song, int, error)
+	ListFn                    func(int, int, string, string, string, string, []int, []string, []string, *bool, *bool) ([]models.Song, int, error)
+	ListKeyCountsFn           func() ([]repositories.KeyCount, error)
+	SearchCandidatesFn        func(string, []int, string, []int, []string, []string, *bool, *bool) ([]repositories.SearchCandidate, error)
+	ListByIDsFn               func([]int) ([]models.Song, error)
 	GetByIDFn                 func(int) (*models.Song, error)
 	GetBySlugFn               func(string) (*models.Song, error)
 	CreateFn                  func(string, string, *string, *int, *string, *string, bool, *string, string) (int, error)
@@ -90,11 +93,29 @@ type SongRepo struct {
 	DeleteSongReportFn        func(int, int) (bool, error)
 }
 
-func (m *SongRepo) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool) ([]models.Song, int, error) {
+func (m *SongRepo) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) ([]models.Song, int, error) {
 	if m.ListFn != nil {
-		return m.ListFn(page, limit, search, baseChord, sortBy, sortOrder, tagIDs, hasLink, chordPro)
+		return m.ListFn(page, limit, search, baseChord, sortBy, sortOrder, tagIDs, keys, artists, hasLink, chordPro)
 	}
 	return nil, 0, nil
+}
+func (m *SongRepo) ListKeyCounts() ([]repositories.KeyCount, error) {
+	if m.ListKeyCountsFn != nil {
+		return m.ListKeyCountsFn()
+	}
+	return nil, nil
+}
+func (m *SongRepo) SearchCandidates(search string, extraIDs []int, baseChord string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) ([]repositories.SearchCandidate, error) {
+	if m.SearchCandidatesFn != nil {
+		return m.SearchCandidatesFn(search, extraIDs, baseChord, tagIDs, keys, artists, hasLink, chordPro)
+	}
+	return nil, nil
+}
+func (m *SongRepo) ListByIDs(ids []int) ([]models.Song, error) {
+	if m.ListByIDsFn != nil {
+		return m.ListByIDsFn(ids)
+	}
+	return nil, nil
 }
 func (m *SongRepo) GetByID(id int) (*models.Song, error) {
 	if m.GetByIDFn != nil {
@@ -479,10 +500,11 @@ func (m *TeamRepo) UpsertMember(playlistID, userID int, role string) error {
 // ── TagRepo ───────────────────────────────────────────────────────────────────
 
 type TagRepo struct {
-	ListFn           func(string) ([]models.Tag, error)
-	FindByNameFn     func(string) (*models.Tag, error)
-	CreateFn         func(string) (int, error)
-	GetTagsForSongFn func(int) ([]models.Tag, error)
+	ListFn            func(string) ([]models.Tag, error)
+	FindByNameFn      func(string) (*models.Tag, error)
+	CreateFn          func(string) (int, error)
+	GetTagsForSongFn  func(int) ([]models.Tag, error)
+	GetTagsForSongsFn func([]int) (map[int][]models.Tag, error)
 }
 
 func (m *TagRepo) List(search string) ([]models.Tag, error) {
@@ -506,6 +528,12 @@ func (m *TagRepo) Create(name string) (int, error) {
 func (m *TagRepo) GetTagsForSong(songID int) ([]models.Tag, error) {
 	if m.GetTagsForSongFn != nil {
 		return m.GetTagsForSongFn(songID)
+	}
+	return nil, nil
+}
+func (m *TagRepo) GetTagsForSongs(songIDs []int) (map[int][]models.Tag, error) {
+	if m.GetTagsForSongsFn != nil {
+		return m.GetTagsForSongsFn(songIDs)
 	}
 	return nil, nil
 }
@@ -859,4 +887,60 @@ func (m *PushProvider) Send(ctx context.Context, tokens []string, title, body st
 		return m.SendFn(ctx, tokens, title, body, data)
 	}
 	return nil
+}
+
+// ── EmbeddingRepo ─────────────────────────────────────────────────────────────
+
+type EmbeddingRepo struct {
+	ReplaceSongChunksFn func(int, string, string, []repositories.SongChunk) error
+	StoredHashesFn      func(string) (map[int]string, error)
+	NearestSongsFn      func([]float32, string, float64, int) ([]repositories.SongDistance, error)
+	SourceFn            func(int) (*repositories.EmbeddingSource, error)
+	AllSourcesFn        func() ([]repositories.EmbeddingSource, error)
+}
+
+func (m *EmbeddingRepo) ReplaceSongChunks(songID int, model, hash string, chunks []repositories.SongChunk) error {
+	if m.ReplaceSongChunksFn != nil {
+		return m.ReplaceSongChunksFn(songID, model, hash, chunks)
+	}
+	return nil
+}
+func (m *EmbeddingRepo) StoredHashes(model string) (map[int]string, error) {
+	if m.StoredHashesFn != nil {
+		return m.StoredHashesFn(model)
+	}
+	return map[int]string{}, nil
+}
+func (m *EmbeddingRepo) NearestSongs(vector []float32, model string, maxDistance float64, limit int) ([]repositories.SongDistance, error) {
+	if m.NearestSongsFn != nil {
+		return m.NearestSongsFn(vector, model, maxDistance, limit)
+	}
+	return nil, nil
+}
+func (m *EmbeddingRepo) Source(songID int) (*repositories.EmbeddingSource, error) {
+	if m.SourceFn != nil {
+		return m.SourceFn(songID)
+	}
+	return nil, nil
+}
+func (m *EmbeddingRepo) AllSources() ([]repositories.EmbeddingSource, error) {
+	if m.AllSourcesFn != nil {
+		return m.AllSourcesFn()
+	}
+	return nil, nil
+}
+
+// ── Embedder ──────────────────────────────────────────────────────────────────
+
+type Embedder struct {
+	ModelName string
+	EmbedFn   func(context.Context, []string) ([][]float32, error)
+}
+
+func (m *Embedder) Model() string { return m.ModelName }
+func (m *Embedder) Embed(ctx context.Context, inputs []string) ([][]float32, error) {
+	if m.EmbedFn != nil {
+		return m.EmbedFn(ctx, inputs)
+	}
+	return nil, nil
 }

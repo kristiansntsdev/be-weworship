@@ -365,3 +365,56 @@ func TestSongService_UpdateSongReportStatus_AllValidStatuses(t *testing.T) {
 		assert.NoError(t, err, "status %q must be accepted", status)
 	}
 }
+
+// ── List filters ──────────────────────────────────────────────────────────────
+
+func TestSongService_List_PassesKeyAndArtistFilters(t *testing.T) {
+	var gotKeys, gotArtists []string
+	mockSongs := &mocks.SongRepo{
+		ListFn: func(_, _ int, _, _, _, _ string, _ []int, keys, artists []string, _, _ *bool) ([]models.Song, int, error) {
+			gotKeys, gotArtists = keys, artists
+			return nil, 0, nil
+		},
+	}
+	svc := &SongService{songs: mockSongs, tags: &mocks.TagRepo{}}
+	_, _, err := svc.List(1, 20, "", "", "title", "ASC", nil, []string{"A", "Bm"}, []string{"Robert & Lea Sutanto"}, nil, nil, false)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"A", "Bm"}, gotKeys)
+	assert.Equal(t, []string{"Robert & Lea Sutanto"}, gotArtists)
+}
+
+func TestSongService_List_LoadsTagsForThePageInOneCall(t *testing.T) {
+	mockSongs := &mocks.SongRepo{
+		ListFn: func(_, _ int, _, _, _, _ string, _ []int, _, _ []string, _, _ *bool) ([]models.Song, int, error) {
+			return []models.Song{{ID: 1, Title: "A"}, {ID: 2, Title: "B"}}, 2, nil
+		},
+	}
+	calls := 0
+	mockTags := &mocks.TagRepo{
+		GetTagsForSongsFn: func(ids []int) (map[int][]models.Tag, error) {
+			calls++
+			assert.Equal(t, []int{1, 2}, ids)
+			return map[int][]models.Tag{2: {{ID: 9, Name: "Worship"}}}, nil
+		},
+	}
+	svc := &SongService{songs: mockSongs, tags: mockTags}
+	data, _, err := svc.List(1, 20, "", "", "title", "ASC", nil, nil, nil, nil, nil, false)
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, calls)
+	assert.Empty(t, data[0]["tags"])
+	assert.Equal(t, "Worship", data[1]["tags"].([]map[string]any)[0]["name"])
+}
+
+func TestBuildSongsCacheKey_DistinguishesFiltersButNotTheirOrder(t *testing.T) {
+	base := buildSongsCacheKey(1, 20, "", "", "title", "ASC", nil, nil, nil, nil, nil)
+	withKeys := buildSongsCacheKey(1, 20, "", "", "title", "ASC", nil, []string{"Bm", "A"}, nil, nil, nil)
+	reordered := buildSongsCacheKey(1, 20, "", "", "title", "ASC", nil, []string{"A", "Bm"}, nil, nil, nil)
+	withArtist := buildSongsCacheKey(1, 20, "", "", "title", "ASC", nil, nil, []string{"Hillsong"}, nil, nil)
+
+	assert.NotEqual(t, base, withKeys)
+	assert.Equal(t, withKeys, reordered)
+	assert.NotEqual(t, base, withArtist)
+	assert.NotEqual(t, withKeys, withArtist)
+}

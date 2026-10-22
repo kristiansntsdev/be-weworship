@@ -46,6 +46,7 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Get("/artists", h.GetArtists)
 	api.Get("/songs", h.GetSongs)
 	api.Get("/songs/export", ra, h.GetSongsExport)
+	api.Get("/songs/keys", h.GetSongKeys)
 	api.Get("/songs/:id", h.GetSongByID)
 	api.Post("/song-requests", ra, h.RequestSong)
 	api.Get("/song-requests", ra, h.GetMySongRequests)

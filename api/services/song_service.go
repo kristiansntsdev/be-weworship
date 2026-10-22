@@ -1,12 +1,14 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"be-songbanks-v1/api/models"
 	"be-songbanks-v1/api/platform"
@@ -15,15 +17,23 @@ import (
 )
 
 type SongService struct {
-	songs     repositories.SongRepoIface
-	tags      repositories.TagRepoIface
-	playlists repositories.PlaylistRepoIface
-	cache     platform.SongCacheIface
+	songs      repositories.SongRepoIface
+	tags       repositories.TagRepoIface
+	playlists  repositories.PlaylistRepoIface
+	cache      platform.SongCacheIface
+	embeddings *SongEmbeddingService // nil = semantic search disabled
 }
 
-func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories.TagRepository, playlistRepo *repositories.PlaylistRepository, cache *platform.SongCache) *SongService {
-	return &SongService{songs: songRepo, tags: tagRepo, playlists: playlistRepo, cache: cache}
+// embeddings may be nil (no embedding service configured): search then ranks by text only.
+func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories.TagRepository, playlistRepo *repositories.PlaylistRepository, cache *platform.SongCache, embeddings *SongEmbeddingService) *SongService {
+	return &SongService{songs: songRepo, tags: tagRepo, playlists: playlistRepo, cache: cache, embeddings: embeddings}
 }
+
+const (
+	semanticSearchTimeout = 2500 * time.Millisecond
+	songIndexTimeout      = 20 * time.Second
+	rrfK                  = 60.0 // reciprocal rank fusion constant
+)
 
 // parseExternalLinks parses a JSON external_links string into individual URL fields.
 // The admin saves keys as "Spotify", "Youtube", "Apple Music" (display names).
@@ -79,6 +89,11 @@ func (s *SongService) Artists() ([]map[string]any, error) {
 	return artists, nil
 }
 
+// Keys returns the distinct song keys (base_chord) with song counts, for key filters.
+func (s *SongService) Keys() ([]repositories.KeyCount, error) {
+	return s.songs.ListKeyCounts()
+}
+
 func (s *SongService) HomeStats() (map[string]any, error) {
 	songCount, err := s.songs.Count()
 	if err != nil {
@@ -104,8 +119,8 @@ func (s *SongService) HomeStats() (map[string]any, error) {
 	}, nil
 }
 
-func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool, useCache bool) ([]map[string]any, map[string]any, error) {
-	cacheKey := buildSongsCacheKey(page, limit, search, baseChord, sortBy, sortOrder, tagIDs, hasLink, chordPro)
+func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool, useCache bool) ([]map[string]any, map[string]any, error) {
+	cacheKey := buildSongsCacheKey(page, limit, search, baseChord, sortBy, sortOrder, tagIDs, keys, artists, hasLink, chordPro)
 	if useCache && s.cache != nil && s.cache.Enabled() {
 		var cached struct {
 			Data       []map[string]any `json:"data"`
@@ -122,23 +137,39 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 		log.Printf("[songs-cache] disabled key=%s", cacheKey)
 	}
 
-	sortMap := map[string]string{"createdAt": `s."createdAt"`, "updatedAt": `s."updatedAt"`, "title": "s.title", "bpm": "s.bpm", "base_chord": "s.base_chord"}
-	mappedSort := sortMap[sortBy]
-	if mappedSort == "" {
-		mappedSort = `s."createdAt"`
+	var rows []models.Song
+	var total int
+	var err error
+	if sortBy == "relevance" && strings.TrimSpace(search) != "" {
+		rows, total, err = s.rankedSearch(page, limit, search, baseChord, tagIDs, keys, artists, hasLink, chordPro)
+	} else {
+		sortMap := map[string]string{"createdAt": `s."createdAt"`, "updatedAt": `s."updatedAt"`, "title": "s.title", "bpm": "s.bpm", "base_chord": "s.base_chord"}
+		mappedSort := sortMap[sortBy]
+		if sortBy == "relevance" {
+			// Nothing to rank without a query: fall back to A–Z.
+			mappedSort, sortOrder = "s.title", "ASC"
+		}
+		if mappedSort == "" {
+			mappedSort = `s."createdAt"`
+		}
+		if strings.ToUpper(sortOrder) != "ASC" {
+			sortOrder = "DESC"
+		}
+		rows, total, err = s.songs.List(page, limit, search, baseChord, mappedSort, strings.ToUpper(sortOrder), tagIDs, keys, artists, hasLink, chordPro)
 	}
-	if strings.ToUpper(sortOrder) != "ASC" {
-		sortOrder = "DESC"
-	}
-
-	rows, total, err := s.songs.List(page, limit, search, baseChord, mappedSort, strings.ToUpper(sortOrder), tagIDs, hasLink, chordPro)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	songIDs := make([]int, len(rows))
+	for i, r := range rows {
+		songIDs[i] = r.ID
+	}
+	tagsBySong, _ := s.tags.GetTagsForSongs(songIDs)
+
 	data := make([]map[string]any, 0, len(rows))
 	for _, r := range rows {
-		tags, _ := s.tags.GetTagsForSong(r.ID)
+		tags := tagsBySong[r.ID]
 		tagRows := make([]map[string]any, 0, len(tags))
 		for _, t := range tags {
 			tagRows = append(tagRows, map[string]any{"id": t.ID, "name": t.Name, "description": utils.NullableString(t.Description)})
@@ -183,6 +214,119 @@ func (s *SongService) List(page, limit int, search, baseChord, sortBy, sortOrder
 		log.Printf("[songs-cache] set key=%s", cacheKey)
 	}
 	return data, pagination, nil
+}
+
+// rankedSearch orders search results by relevance. Text matches (exact title, phrase, all words, typo-tolerant
+// trigram) and semantic matches (bge-m3 embeddings of the title/lyrics/stanzas) are ranked separately and merged
+// with reciprocal rank fusion. Without an embedder, or when it errors or times out, it ranks by text alone.
+func (s *SongService) rankedSearch(page, limit int, search, baseChord string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) ([]models.Song, int, error) {
+	var semanticIDs []int
+	if s.embeddings != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), semanticSearchTimeout)
+		matches, err := s.embeddings.SemanticMatches(ctx, search)
+		cancel()
+		if err != nil {
+			log.Printf("[search] semantic search unavailable, ranking by text only: %v", err)
+		}
+		for _, m := range matches {
+			semanticIDs = append(semanticIDs, m.SongID)
+		}
+	}
+
+	cands, err := s.songs.SearchCandidates(search, semanticIDs, baseChord, tagIDs, keys, artists, hasLink, chordPro)
+	if err != nil {
+		return nil, 0, err
+	}
+	ordered := rankCandidates(cands, semanticIDs)
+
+	total := len(ordered)
+	start := min((page-1)*limit, total)
+	pageIDs := ordered[start:min(start+limit, total)]
+	rows, err := s.songs.ListByIDs(pageIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	byID := make(map[int]models.Song, len(rows))
+	for _, r := range rows {
+		byID[r.ID] = r
+	}
+	out := make([]models.Song, 0, len(pageIDs))
+	for _, id := range pageIDs {
+		if r, ok := byID[id]; ok {
+			out = append(out, r)
+		}
+	}
+	return out, total, nil
+}
+
+// rankCandidates merges the text ranking (candidates with LexMatch, by LexScore) and the semantic ranking
+// (semanticIDs, nearest first) with reciprocal rank fusion and returns candidate ids best first.
+// Strong text matches always come first (exact title, then a verbatim line): someone typing a title or a line they
+// know should not see a loosely related song above it. Semantic ids removed by filters are ignored.
+func rankCandidates(cands []repositories.SearchCandidate, semanticIDs []int) []int {
+	inCands := make(map[int]bool, len(cands))
+	lex := make([]repositories.SearchCandidate, 0, len(cands))
+	for _, c := range cands {
+		inCands[c.ID] = true
+		if c.LexMatch {
+			lex = append(lex, c)
+		}
+	}
+	sort.SliceStable(lex, func(i, j int) bool {
+		if lex[i].LexScore != lex[j].LexScore {
+			return lex[i].LexScore > lex[j].LexScore
+		}
+		return lex[i].Title < lex[j].Title
+	})
+
+	score := make(map[int]float64, len(cands))
+	for rank, c := range lex {
+		score[c.ID] += 1 / (rrfK + float64(rank+1))
+	}
+	rank := 0
+	for _, id := range semanticIDs {
+		if !inCands[id] {
+			continue
+		}
+		rank++
+		score[id] += 1 / (rrfK + float64(rank))
+	}
+
+	ordered := append([]repositories.SearchCandidate(nil), cands...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if ordered[i].Strength != ordered[j].Strength {
+			return ordered[i].Strength > ordered[j].Strength
+		}
+		si, sj := score[ordered[i].ID], score[ordered[j].ID]
+		if si != sj {
+			return si > sj
+		}
+		if ordered[i].LexScore != ordered[j].LexScore {
+			return ordered[i].LexScore > ordered[j].LexScore
+		}
+		if ordered[i].Title != ordered[j].Title {
+			return ordered[i].Title < ordered[j].Title
+		}
+		return ordered[i].ID < ordered[j].ID
+	})
+	ids := make([]int, len(ordered))
+	for i, c := range ordered {
+		ids[i] = c.ID
+	}
+	return ids
+}
+
+// reindexSong refreshes a song's embeddings after an admin edit. It runs inline because serverless instances
+// can be frozen after the response; a failure is only logged — the backfill retries it via the content hash.
+func (s *SongService) reindexSong(songID int) {
+	if s.embeddings == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), songIndexTimeout)
+	defer cancel()
+	if _, err := s.embeddings.IndexSong(ctx, songID); err != nil {
+		log.Printf("[embeddings] song_id=%d not re-indexed (run the backfill to retry): %v", songID, err)
+	}
 }
 
 func (s *SongService) GetByID(id int) (map[string]any, bool, error) {
@@ -277,6 +421,7 @@ func (s *SongService) Create(title string, artist any, baseChord *string, bpm *i
 		s.cache.InvalidateArtists()
 		log.Printf("[songs-cache] invalidate reason=create song_id=%d", songID)
 	}
+	s.reindexSong(songID)
 	return map[string]any{"id": songID, "title": title}, nil
 }
 
@@ -343,6 +488,9 @@ func (s *SongService) Update(songID int, title *string, artist any, baseChord *s
 		s.cache.InvalidateSongsList()
 		s.cache.InvalidateArtists()
 		log.Printf("[songs-cache] invalidate reason=update song_id=%d", songID)
+	}
+	if title != nil || artist != nil || lyrics != nil {
+		s.reindexSong(songID)
 	}
 	return true, nil
 }
@@ -414,7 +562,7 @@ func (s *SongService) assignTags(songID int, names []string) error {
 	return nil
 }
 
-func buildSongsCacheKey(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool) string {
+func buildSongsCacheKey(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) string {
 	ids := append([]int(nil), tagIDs...)
 	sort.Ints(ids)
 	tagPart := ""
@@ -433,8 +581,13 @@ func buildSongsCacheKey(page, limit int, search, baseChord, sortBy, sortOrder st
 		}
 		return "false"
 	}
-	return fmt.Sprintf("songs:list:page=%d:limit=%d:search=%s:base=%s:sortBy=%s:sortOrder=%s:tags=%s:hasLink=%s:chordPro=%s",
-		page, limit, strings.TrimSpace(search), strings.TrimSpace(baseChord), sortBy, strings.ToUpper(sortOrder), tagPart, boolPart(hasLink), boolPart(chordPro))
+	listPart := func(v []string) string {
+		sorted := append([]string(nil), v...)
+		sort.Strings(sorted)
+		return url.QueryEscape(strings.Join(sorted, "|"))
+	}
+	return fmt.Sprintf("songs:list:page=%d:limit=%d:search=%s:base=%s:sortBy=%s:sortOrder=%s:tags=%s:keys=%s:artists=%s:hasLink=%s:chordPro=%s",
+		page, limit, strings.TrimSpace(search), strings.TrimSpace(baseChord), sortBy, strings.ToUpper(sortOrder), tagPart, listPart(keys), listPart(artists), boolPart(hasLink), boolPart(chordPro))
 }
 
 // ── Song Requests ─────────────────────────────────────────────────────────────

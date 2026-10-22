@@ -8,6 +8,7 @@ import (
 	"be-songbanks-v1/api/handlers"
 	"be-songbanks-v1/api/middleware"
 	"be-songbanks-v1/api/platform"
+	"be-songbanks-v1/api/providers"
 	"be-songbanks-v1/api/repositories"
 	"be-songbanks-v1/api/services"
 	"github.com/joho/godotenv"
@@ -71,7 +72,8 @@ func buildApp() (*fiber.App, error) {
 		MobileScheme: os.Getenv("MOBILE_SCHEME"),
 	})
 	tagSvc := services.NewTagService(tagRepo)
-	songSvc := services.NewSongService(songRepo, tagRepo, playlistRepo, songCache)
+	songEmbeddings := services.NewSongEmbeddingService(repositories.NewEmbeddingRepository(ctx.DB), providers.NewEmbedderFromEnv())
+	songSvc := services.NewSongService(songRepo, tagRepo, playlistRepo, songCache, songEmbeddings)
 	playlistSvc := services.NewPlaylistService(
 		playlistRepo, teamRepo, songRepo, ctx.ClientURL, liveCache, authSvc,
 		os.Getenv("REALTIME_WS_URL"),

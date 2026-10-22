@@ -19,7 +19,9 @@ type AuthRepoIface interface {
 
 // SongRepoIface abstracts SongRepository for testing.
 type SongRepoIface interface {
-	List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, hasLink, chordPro *bool) ([]models.Song, int, error)
+	List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) ([]models.Song, int, error)
+	SearchCandidates(search string, extraIDs []int, baseChord string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) ([]SearchCandidate, error)
+	ListByIDs(ids []int) ([]models.Song, error)
 	GetByID(id int) (*models.Song, error)
 	GetBySlug(slug string) (*models.Song, error)
 	Create(title, artistJSON string, baseChord *string, bpm *int, lyrics *string, externalLinks *string, dmcaTakedown bool, dmcaStatusNotes *string, baseSlug string) (int, error)
@@ -29,6 +31,7 @@ type SongRepoIface interface {
 	AssignSongTag(songID, tagID int) error
 	ExistsByID(id int) (bool, error)
 	ListArtistsRaw() ([]string, error)
+	ListKeyCounts() ([]KeyCount, error)
 	Count() (int, error)
 	ListAllChordPro() ([]models.Song, error)
 	CreateSongRequest(userID int, songTitle, referenceLink, lyricsType, lyrics string) (*models.SongRequest, error)
@@ -92,6 +95,7 @@ type TagRepoIface interface {
 	FindByName(name string) (*models.Tag, error)
 	Create(name string) (int, error)
 	GetTagsForSong(songID int) ([]models.Tag, error)
+	GetTagsForSongs(songIDs []int) (map[int][]models.Tag, error)
 }
 
 // UserRepoIface abstracts UserRepository for testing.
@@ -149,4 +153,13 @@ type InvitationRepoIface interface {
 	FindPendingByID(id int) (*models.PlaylistInvitation, error)
 	FindPendingByPlaylistAndInvitee(playlistID, inviteeID int) (*models.PlaylistInvitation, error)
 	UpdateStatus(id int, status string) error
+}
+
+// EmbeddingRepoIface abstracts EmbeddingRepository for testing.
+type EmbeddingRepoIface interface {
+	ReplaceSongChunks(songID int, model, hash string, chunks []SongChunk) error
+	StoredHashes(model string) (map[int]string, error)
+	NearestSongs(vector []float32, model string, maxDistance float64, limit int) ([]SongDistance, error)
+	Source(songID int) (*EmbeddingSource, error)
+	AllSources() ([]EmbeddingSource, error)
 }

@@ -65,7 +65,10 @@ func (h *Handler) GetSongs(c *fiber.Ctx) error {
 		t := true
 		chordPro = &t
 	}
-	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), hasLink, chordPro, isMobileClient)
+	// key / artist are repeatable (?key=A&key=Bm&artist=Hillsong): artist names can contain commas.
+	keys := queryValues(c, "key")
+	artists := queryValues(c, "artist")
+	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), keys, artists, hasLink, chordPro, isMobileClient)
 	if err != nil {
 		return utils.FailErr(c, 500, "Failed to retrieve songs", err)
 	}
@@ -78,6 +81,25 @@ func isMobileUserAgent(ua string) bool {
 		strings.Contains(ua, "cfnetwork") ||
 		strings.Contains(ua, "expo") ||
 		strings.Contains(ua, "reactnative")
+}
+
+// queryValues returns every non-empty value of a repeated query parameter.
+func queryValues(c *fiber.Ctx, name string) []string {
+	var out []string
+	for _, v := range c.Context().QueryArgs().PeekMulti(name) {
+		if s := strings.TrimSpace(string(v)); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func (h *Handler) GetSongKeys(c *fiber.Ctx) error {
+	keys, err := h.songs.Keys()
+	if err != nil {
+		return utils.FailErr(c, 500, "Failed to retrieve song keys", err)
+	}
+	return utils.OK(c, 200, "Song keys retrieved successfully", keys)
 }
 
 func (h *Handler) GetSongsExport(c *fiber.Ctx) error {
