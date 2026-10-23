@@ -15,6 +15,7 @@ type AuthRepoIface interface {
 	FindManyByIDs(ids []int) ([]models.UserBasic, error)
 	FindOrCreateGoogleUser(email, username, providerID string) (*models.User, error)
 	CreateLocal(username, email, hashedPassword string) (*models.User, error)
+	UpdateUsername(id int, username string) (*models.User, error)
 }
 
 // SongRepoIface abstracts SongRepository for testing.

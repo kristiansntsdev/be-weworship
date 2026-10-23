@@ -75,6 +75,20 @@ func (r *AuthRepository) FindOrCreateGoogleUser(email, username, providerID stri
 	return r.FindByEmail(email)
 }
 
+// UpdateUsername renames a user. Returns nil, nil if the user does not exist.
+func (r *AuthRepository) UpdateUsername(id int, username string) (*models.User, error) {
+	var u models.User
+	err := r.db.Get(&u, r.db.Rebind(`UPDATE users SET username=?, "updatedAt"=NOW() WHERE id=?
+		RETURNING id,username,email,password,avatar_url,role,provider,provider_id,verified,status,"createdAt","updatedAt"`), username, id)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
 // CreateLocal registers a new local (email+password) user. Password must already be hashed.
 func (r *AuthRepository) CreateLocal(username, email, hashedPassword string) (*models.User, error) {
 	userCode := uuid.NewString()[:8]

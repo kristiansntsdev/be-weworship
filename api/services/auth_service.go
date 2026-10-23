@@ -206,6 +206,30 @@ func (s *AuthService) Register(username, email, password string) (map[string]any
 	return map[string]any{"token": token, "user": mapUser(*u)}, 201, nil
 }
 
+// ChangeUsername renames the user and returns a fresh JWT, since the username is carried in the token claims.
+func (s *AuthService) ChangeUsername(userID int, username string) (map[string]any, int, error) {
+	username = strings.TrimSpace(username)
+	if err := utils.ValidateUsername(username); err != nil {
+		return nil, 400, err
+	}
+	u, err := s.repo.UpdateUsername(userID, username)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && strings.Contains(pgErr.ConstraintName, "username") {
+			return nil, 409, fmt.Errorf("username '%s' is already taken", username)
+		}
+		return nil, 500, err
+	}
+	if u == nil {
+		return nil, 404, fmt.Errorf("user not found")
+	}
+	token, err := s.issueToken(u)
+	if err != nil {
+		return nil, 500, err
+	}
+	return map[string]any{"token": token, "user": mapUser(*u)}, 200, nil
+}
+
 // Login authenticates a user by email + password.
 func (s *AuthService) Login(email, password string) (map[string]any, int, error) {
 email = strings.TrimSpace(email)

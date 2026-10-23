@@ -27,6 +27,7 @@ type AuthRepo struct {
 	FindManyByIDsFn          func([]int) ([]models.UserBasic, error)
 	FindOrCreateGoogleUserFn func(string, string, string) (*models.User, error)
 	CreateLocalFn            func(string, string, string) (*models.User, error)
+	UpdateUsernameFn         func(int, string) (*models.User, error)
 }
 
 func (m *AuthRepo) FindByEmail(email string) (*models.User, error) {
@@ -56,6 +57,12 @@ func (m *AuthRepo) FindOrCreateGoogleUser(email, name, providerID string) (*mode
 func (m *AuthRepo) CreateLocal(name, email, hashedPassword string) (*models.User, error) {
 	if m.CreateLocalFn != nil {
 		return m.CreateLocalFn(name, email, hashedPassword)
+	}
+	return nil, nil
+}
+func (m *AuthRepo) UpdateUsername(id int, username string) (*models.User, error) {
+	if m.UpdateUsernameFn != nil {
+		return m.UpdateUsernameFn(id, username)
 	}
 	return nil, nil
 }

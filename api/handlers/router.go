@@ -71,6 +71,7 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Get("/auth/check-permission", ra, h.CheckPermission)
 	api.Put("/profile", ra, h.UpdateProfile)
 	api.Put("/profile/avatar", ra, h.UpdateAvatar)
+	api.Put("/profile/username", ra, h.UpdateUsername)
 
 	// ── Push notifications ─────────────────────────────────────────────────────
 	api.Post("/notifications/device-token", ra, h.RegisterDeviceToken)

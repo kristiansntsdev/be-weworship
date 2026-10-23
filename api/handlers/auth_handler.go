@@ -174,6 +174,24 @@ func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
 	return utils.OK(c, 200, "Profile updated successfully", nil)
 }
 
+// UpdateUsername renames the current user. The response carries a new token because
+// the old one still holds the previous username in its claims.
+func (h *Handler) UpdateUsername(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	var req struct {
+		Username string `json:"username"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid request body")
+	}
+	data, status, err := h.auth.ChangeUsername(cl.UserID, req.Username)
+	if err != nil {
+		return utils.FailErr(c, status, err.Error(), err)
+	}
+	injectDetail(h, data)
+	return utils.OK(c, status, "Username updated successfully", data)
+}
+
 func (h *Handler) CheckPermission(c *fiber.Ctx) error {
 	cl := middleware.GetClaims(c)
 	role := c.Query("role")

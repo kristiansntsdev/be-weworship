@@ -6,6 +6,7 @@ import (
 
 	"be-songbanks-v1/api/models"
 	"be-songbanks-v1/api/services/mocks"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
@@ -74,6 +75,57 @@ func TestAuthService_Register_DuplicateEmail(t *testing.T) {
 	_, status, err := svc.Register("alice_user", "alice@example.com", "password123")
 	assert.Equal(t, 409, status)
 	assert.ErrorContains(t, err, "already exists")
+}
+
+// ── ChangeUsername ────────────────────────────────────────────────────────────
+
+func TestAuthService_ChangeUsername_Success(t *testing.T) {
+	mockRepo := &mocks.AuthRepo{
+		UpdateUsernameFn: func(id int, username string) (*models.User, error) {
+			return &models.User{ID: id, Username: username, Email: "alice@example.com", Role: "user", Status: "active"}, nil
+		},
+	}
+	svc := newTestAuthService(mockRepo)
+	result, status, err := svc.ChangeUsername(1, "  new.alice  ")
+
+	require.NoError(t, err)
+	assert.Equal(t, 200, status)
+	user, ok := result["user"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "new.alice", user["username"])
+
+	// The new token must carry the new username, since /auth/me reads it from the claims.
+	token, ok := result["token"].(string)
+	require.True(t, ok)
+	claims, err := svc.ParseToken(token)
+	require.NoError(t, err)
+	assert.Equal(t, "new.alice", claims.Username)
+}
+
+func TestAuthService_ChangeUsername_Invalid(t *testing.T) {
+	svc := newTestAuthService(&mocks.AuthRepo{})
+	_, status, err := svc.ChangeUsername(1, "ab")
+	assert.Equal(t, 400, status)
+	assert.ErrorContains(t, err, "at least 6 characters")
+}
+
+func TestAuthService_ChangeUsername_Taken(t *testing.T) {
+	mockRepo := &mocks.AuthRepo{
+		UpdateUsernameFn: func(int, string) (*models.User, error) {
+			return nil, &pgconn.PgError{Code: "23505", ConstraintName: "users_username_key"}
+		},
+	}
+	svc := newTestAuthService(mockRepo)
+	_, status, err := svc.ChangeUsername(1, "bob_user")
+	assert.Equal(t, 409, status)
+	assert.ErrorContains(t, err, "already taken")
+}
+
+func TestAuthService_ChangeUsername_UserNotFound(t *testing.T) {
+	svc := newTestAuthService(&mocks.AuthRepo{})
+	_, status, err := svc.ChangeUsername(1, "bob_user")
+	assert.Equal(t, 404, status)
+	assert.ErrorContains(t, err, "not found")
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
