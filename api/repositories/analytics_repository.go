@@ -68,20 +68,23 @@ func (r *AnalyticsRepository) RecordPerformance(userID *int, platform, metricTyp
 
 // ── Read Aggregates ──────────────────────────────────────────────────────────
 
+// TopSongRow is a song ranked by total song_events (admin analytics).
 type TopSongRow struct {
-	SongID    *int   `db:"song_id"`
-	EventType string `db:"event_type"`
-	Count     int    `db:"count"`
+	SongID    int            `db:"song_id"`
+	Title     string         `db:"title"`
+	Artist    sql.NullString `db:"artist"`
+	PlayCount int            `db:"play_count"`
 }
 
 func (r *AnalyticsRepository) TopSongs(days int, limit int) ([]TopSongRow, error) {
 	rows := []TopSongRow{}
 	err := r.db.Select(&rows, r.db.Rebind(`
-SELECT song_id, event_type, COUNT(*) as count
-FROM song_events
-WHERE song_id IS NOT NULL AND "createdAt" >= NOW() - ? * INTERVAL '1 day'
-GROUP BY song_id, event_type
-ORDER BY count DESC
+SELECT s.id AS song_id, s.title, s.artist, COUNT(*)::int AS play_count
+FROM song_events e
+JOIN songs s ON s.id = e.song_id
+WHERE e.song_id IS NOT NULL AND e."createdAt" >= NOW() - ? * INTERVAL '1 day'
+GROUP BY s.id, s.title, s.artist
+ORDER BY play_count DESC
 LIMIT ?`), days, limit)
 	return rows, err
 }

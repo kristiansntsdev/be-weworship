@@ -70,7 +70,26 @@ func (s *AnalyticsService) RecordPerformance(userID *int, platform, metricType s
 // Admin analytics aggregates
 
 func (s *AnalyticsService) TopSongs(days, limit int) (any, error) {
-	return s.repo.TopSongs(days, limit)
+	rows, err := s.repo.TopSongs(days, limit)
+	if err != nil {
+		return nil, err
+	}
+	// Shape matches fe-admin dashboard DataTable / TopSongsChart (song_id, title, artist, play_count).
+	out := make([]map[string]any, 0, len(rows))
+	for _, r := range rows {
+		artist := strings.Join(utils.ParseArtists(r.Artist.String), ", ")
+		var artistVal any
+		if artist != "" {
+			artistVal = artist
+		}
+		out = append(out, map[string]any{
+			"song_id":    r.SongID,
+			"title":      r.Title,
+			"artist":     artistVal,
+			"play_count": r.PlayCount,
+		})
+	}
+	return out, nil
 }
 
 func (s *AnalyticsService) UserStats(days int) (map[string]any, error) {

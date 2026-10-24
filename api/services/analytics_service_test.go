@@ -13,12 +13,11 @@ import (
 // ── TopSongs ──────────────────────────────────────────────────────────────────
 
 func TestAnalyticsService_TopSongs_Success(t *testing.T) {
-	id1, id2 := 1, 2
 	mockRepo := &mocks.AnalyticsRepo{
 		TopSongsFn: func(days, limit int) ([]repositories.TopSongRow, error) {
 			return []repositories.TopSongRow{
-				{SongID: &id1, EventType: "play", Count: 50},
-				{SongID: &id2, EventType: "play", Count: 30},
+				{SongID: 1, Title: "A", PlayCount: 50},
+				{SongID: 2, Title: "B", PlayCount: 30},
 			}, nil
 		},
 	}
@@ -26,10 +25,11 @@ func TestAnalyticsService_TopSongs_Success(t *testing.T) {
 	result, err := svc.TopSongs(30, 10)
 
 	require.NoError(t, err)
-	rows, ok := result.([]repositories.TopSongRow)
+	rows, ok := result.([]map[string]any)
 	require.True(t, ok)
 	assert.Len(t, rows, 2)
-	assert.Equal(t, 50, rows[0].Count)
+	assert.Equal(t, 50, rows[0]["play_count"])
+	assert.Equal(t, "A", rows[0]["title"])
 }
 
 func TestAnalyticsService_TopSongs_RepoError(t *testing.T) {
