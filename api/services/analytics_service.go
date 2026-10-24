@@ -67,6 +67,10 @@ func (s *AnalyticsService) TopSearches(days, limit int) (any, error) {
 	return s.repo.TopSearches(days, limit)
 }
 
+func (s *AnalyticsService) RecentSearches(userID, limit int) ([]string, error) {
+	return s.repo.RecentSearchesByUser(userID, limit)
+}
+
 func (s *AnalyticsService) SessionsByPlatform(days int) (any, error) {
 	return s.repo.SessionsByPlatform(days)
 }

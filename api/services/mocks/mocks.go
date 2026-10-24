@@ -693,12 +693,13 @@ type AnalyticsRepo struct {
 	TopSongsFn           func(int, int) ([]repositories.TopSongRow, error)
 	NewUsersPerDayFn     func(int) ([]repositories.DailyCountRow, error)
 	DAUFn                func(int) ([]repositories.DailyCountRow, error)
-	TopSearchesFn        func(int, int) ([]repositories.TopSearchRow, error)
-	SessionsByPlatformFn func(int) ([]repositories.PlatformBreakdownRow, error)
-	PerformanceSummaryFn func(int) ([]repositories.PerfSummaryRow, error)
-	TotalUsersFn         func() (int, error)
-	DAUTodayFn           func() (int, error)
-	MAUFn                func() (int, error)
+	TopSearchesFn          func(int, int) ([]repositories.TopSearchRow, error)
+	RecentSearchesByUserFn func(int, int) ([]string, error)
+	SessionsByPlatformFn   func(int) ([]repositories.PlatformBreakdownRow, error)
+	PerformanceSummaryFn   func(int) ([]repositories.PerfSummaryRow, error)
+	TotalUsersFn           func() (int, error)
+	DAUTodayFn             func() (int, error)
+	MAUFn                  func() (int, error)
 }
 
 func (m *AnalyticsRepo) RecordSongEvent(songID, userID *int, eventType, platform string, durationMs *int) {
@@ -744,6 +745,12 @@ func (m *AnalyticsRepo) DAU(days int) ([]repositories.DailyCountRow, error) {
 func (m *AnalyticsRepo) TopSearches(days, limit int) ([]repositories.TopSearchRow, error) {
 	if m.TopSearchesFn != nil {
 		return m.TopSearchesFn(days, limit)
+	}
+	return nil, nil
+}
+func (m *AnalyticsRepo) RecentSearchesByUser(userID, limit int) ([]string, error) {
+	if m.RecentSearchesByUserFn != nil {
+		return m.RecentSearchesByUserFn(userID, limit)
 	}
 	return nil, nil
 }

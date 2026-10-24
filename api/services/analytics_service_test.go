@@ -197,3 +197,17 @@ func TestAnalyticsService_TopSearches_Success(t *testing.T) {
 	rows := result.([]repositories.TopSearchRow)
 	assert.Len(t, rows, 1)
 }
+
+func TestAnalyticsService_RecentSearches_Success(t *testing.T) {
+	mockRepo := &mocks.AnalyticsRepo{
+		RecentSearchesByUserFn: func(userID, limit int) ([]string, error) {
+			assert.Equal(t, 42, userID)
+			assert.Equal(t, 5, limit)
+			return []string{"amazing grace", "how great"}, nil
+		},
+	}
+	svc := &AnalyticsService{repo: mockRepo}
+	result, err := svc.RecentSearches(42, 5)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"amazing grace", "how great"}, result)
+}

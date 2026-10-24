@@ -159,6 +159,7 @@ CREATE INDEX IF NOT EXISTS idx_songs_artist             ON songs(artist);
 CREATE INDEX IF NOT EXISTS idx_song_events_song_id      ON song_events(song_id);
 CREATE INDEX IF NOT EXISTS idx_song_events_created      ON song_events("createdAt");
 CREATE INDEX IF NOT EXISTS idx_search_logs_created      ON search_logs("createdAt");
+CREATE INDEX IF NOT EXISTS idx_search_logs_user_created ON search_logs(user_id, "createdAt" DESC);
 CREATE INDEX IF NOT EXISTS idx_app_sessions_created     ON app_sessions("createdAt");
 CREATE INDEX IF NOT EXISTS idx_perf_logs_metric_type    ON performance_logs(metric_type);
 CREATE INDEX IF NOT EXISTS idx_perf_logs_created        ON performance_logs("createdAt");

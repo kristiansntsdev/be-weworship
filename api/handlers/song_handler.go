@@ -65,14 +65,68 @@ func (h *Handler) GetSongs(c *fiber.Ctx) error {
 		t := true
 		chordPro = &t
 	}
+	search := strings.TrimSpace(c.Query("search"))
+	baseChord := c.Query("base_chord")
 	// key / artist are repeatable (?key=A&key=Bm&artist=Hillsong): artist names can contain commas.
 	keys := queryValues(c, "key")
 	artists := queryValues(c, "artist")
-	data, pagination, err := h.songs.List(page, limit, c.Query("search"), c.Query("base_chord"), c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), keys, artists, hasLink, chordPro, isMobileClient)
+	data, pagination, err := h.songs.List(page, limit, search, baseChord, c.Query("sortBy", "createdAt"), c.Query("sortOrder", "DESC"), utils.ParseCSVInts(c.Query("tag_ids")), keys, artists, hasLink, chordPro, isMobileClient)
 	if err != nil {
 		return utils.FailErr(c, 500, "Failed to retrieve songs", err)
 	}
+	// Log first-page searches for personal history + admin analytics.
+	if search != "" && page == 1 && h.analytics != nil {
+		var userID *int
+		if cl := middleware.GetClaims(c); cl != nil {
+			id := cl.UserID
+			userID = &id
+		}
+		platform := "web"
+		if isMobileClient {
+			platform = "mobile"
+		}
+		resultsCount := paginationTotalItems(pagination)
+		filters := map[string]any{}
+		if baseChord != "" {
+			filters["base_chord"] = baseChord
+		}
+		if hasLink != nil {
+			filters["has_link"] = *hasLink
+		}
+		if chordPro != nil {
+			filters["chordpro"] = *chordPro
+		}
+		if len(keys) > 0 {
+			filters["key"] = keys
+		}
+		if len(artists) > 0 {
+			filters["artist"] = artists
+		}
+		h.analytics.RecordSearch(userID, search, filters, resultsCount, platform)
+	}
 	return c.JSON(fiber.Map{"code": 200, "message": "Songs retrieved successfully", "data": data, "pagination": pagination})
+}
+
+func (h *Handler) GetSongSearchHistory(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Access token required")
+	}
+	limit := c.QueryInt("limit", 10)
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	queries, err := h.analytics.RecentSearches(cl.UserID, limit)
+	if err != nil {
+		return utils.FailErr(c, 500, "Failed to retrieve search history", err)
+	}
+	if queries == nil {
+		queries = []string{}
+	}
+	return utils.OK(c, 200, "Search history retrieved", queries)
 }
 
 func isMobileUserAgent(ua string) bool {
@@ -81,6 +135,19 @@ func isMobileUserAgent(ua string) bool {
 		strings.Contains(ua, "cfnetwork") ||
 		strings.Contains(ua, "expo") ||
 		strings.Contains(ua, "reactnative")
+}
+
+func paginationTotalItems(pagination map[string]any) int {
+	switch v := pagination["totalItems"].(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	default:
+		return 0
+	}
 }
 
 // queryValues returns every non-empty value of a repeated query parameter.

@@ -105,6 +105,24 @@ LIMIT ?`), days, limit)
 	return rows, err
 }
 
+// RecentSearchesByUser returns the user's most recent unique song search queries.
+func (r *AnalyticsRepository) RecentSearchesByUser(userID, limit int) ([]string, error) {
+	if limit < 1 {
+		limit = 10
+	}
+	rows := []string{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+SELECT query FROM (
+  SELECT DISTINCT ON (LOWER(TRIM(query))) TRIM(query) AS query, "createdAt"
+  FROM search_logs
+  WHERE user_id = ? AND TRIM(query) <> ''
+  ORDER BY LOWER(TRIM(query)), "createdAt" DESC
+) t
+ORDER BY "createdAt" DESC
+LIMIT ?`), userID, limit)
+	return rows, err
+}
+
 type PlatformBreakdownRow struct {
 	Date     string `db:"date" json:"date"`
 	Platform string `db:"platform" json:"platform"`
