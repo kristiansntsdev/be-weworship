@@ -818,6 +818,15 @@ func (s *SongService) ListFavorites(userID int) ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	return s.mapsForOrderedIDs(ids, true)
+}
+
+// ListByOrderedIDs maps song ids to list cards, preserving order (skips missing).
+func (s *SongService) ListByOrderedIDs(ids []int) ([]map[string]any, error) {
+	return s.mapsForOrderedIDs(ids, false)
+}
+
+func (s *SongService) mapsForOrderedIDs(ids []int, markFavorite bool) ([]map[string]any, error) {
 	if len(ids) == 0 {
 		return []map[string]any{}, nil
 	}
@@ -841,7 +850,7 @@ func (s *SongService) ListFavorites(userID int) ([]map[string]any, error) {
 			tagRows = append(tagRows, map[string]any{"id": t.ID, "name": t.Name, "description": utils.NullableString(t.Description)})
 		}
 		sp, yt, am := parseExternalLinks(row.ExternalLinks.String)
-		out = append(out, map[string]any{
+		item := map[string]any{
 			"id":                row.ID,
 			"slug":              utils.NullableString(row.Slug),
 			"title":             row.Title,
@@ -852,8 +861,11 @@ func (s *SongService) ListFavorites(userID int) ([]map[string]any, error) {
 			"youtube_url":       yt,
 			"apple_music_url":   am,
 			"tags":              tagRows,
-			"is_favorite":       true,
-		})
+		}
+		if markFavorite {
+			item["is_favorite"] = true
+		}
+		out = append(out, item)
 	}
 	return out, nil
 }

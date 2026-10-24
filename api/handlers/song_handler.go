@@ -87,36 +87,8 @@ func (h *Handler) GetSongs(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.FailErr(c, 500, "Failed to retrieve songs", err)
 	}
-	// Log first-page searches for personal history + admin analytics.
-	if search != "" && page == 1 && h.analytics != nil {
-		var userID *int
-		if cl := middleware.GetClaims(c); cl != nil {
-			id := cl.UserID
-			userID = &id
-		}
-		platform := "web"
-		if isMobileClient {
-			platform = "mobile"
-		}
-		resultsCount := paginationTotalItems(pagination)
-		filters := map[string]any{}
-		if baseChord != "" {
-			filters["base_chord"] = baseChord
-		}
-		if hasLink != nil {
-			filters["has_link"] = *hasLink
-		}
-		if chordPro != nil {
-			filters["chordpro"] = *chordPro
-		}
-		if len(keys) > 0 {
-			filters["key"] = keys
-		}
-		if len(artists) > 0 {
-			filters["artist"] = artists
-		}
-		h.analytics.RecordSearch(userID, search, filters, resultsCount, platform)
-	}
+	// ponytail: don't log every keystroke search into search_logs — that filled account
+	// history with typos/partials. Personal "search history" is view-history of songs opened.
 	return c.JSON(fiber.Map{"code": 200, "message": "Songs retrieved successfully", "data": data, "pagination": pagination})
 }
 
@@ -142,25 +114,39 @@ func (h *Handler) GetSongSearchHistory(c *fiber.Ctx) error {
 	return utils.OK(c, 200, "Search history retrieved", queries)
 }
 
+// GetSongViewHistory returns songs the user opened (clicked), newest first.
+func (h *Handler) GetSongViewHistory(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Access token required")
+	}
+	limit := c.QueryInt("limit", 30)
+	if limit < 1 {
+		limit = 30
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	if h.analytics == nil {
+		return utils.OK(c, 200, "View history retrieved", []any{})
+	}
+	ids, err := h.analytics.RecentViewedSongIDs(cl.UserID, limit)
+	if err != nil {
+		return utils.FailErr(c, 500, "Failed to retrieve view history", err)
+	}
+	data, err := h.songs.ListByOrderedIDs(ids)
+	if err != nil {
+		return utils.FailErr(c, 500, "Failed to retrieve view history", err)
+	}
+	return utils.OK(c, 200, "View history retrieved", data)
+}
+
 func isMobileUserAgent(ua string) bool {
 	ua = strings.ToLower(ua)
 	return strings.Contains(ua, "okhttp") ||
 		strings.Contains(ua, "cfnetwork") ||
 		strings.Contains(ua, "expo") ||
 		strings.Contains(ua, "reactnative")
-}
-
-func paginationTotalItems(pagination map[string]any) int {
-	switch v := pagination["totalItems"].(type) {
-	case int:
-		return v
-	case int64:
-		return int(v)
-	case float64:
-		return int(v)
-	default:
-		return 0
-	}
 }
 
 // queryValues returns every non-empty value of a repeated query parameter.

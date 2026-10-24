@@ -729,8 +729,9 @@ type AnalyticsRepo struct {
 	NewUsersPerDayFn       func(int) ([]repositories.DailyCountRow, error)
 	DAUFn                  func(int) ([]repositories.DailyCountRow, error)
 	TopSearchesFn          func(int, int) ([]repositories.TopSearchRow, error)
-	RecentSearchesByUserFn func(int, int) ([]string, error)
-	SessionsByPlatformFn   func(int) ([]repositories.PlatformBreakdownRow, error)
+	RecentSearchesByUserFn  func(int, int) ([]string, error)
+	RecentViewedSongIDsFn   func(int, int) ([]int, error)
+	SessionsByPlatformFn    func(int) ([]repositories.PlatformBreakdownRow, error)
 	PerformanceSummaryFn   func(int) ([]repositories.PerfSummaryRow, error)
 	TotalUsersFn           func() (int, error)
 	DAUTodayFn             func() (int, error)
@@ -792,6 +793,12 @@ func (m *AnalyticsRepo) TopSearches(days, limit int) ([]repositories.TopSearchRo
 func (m *AnalyticsRepo) RecentSearchesByUser(userID, limit int) ([]string, error) {
 	if m.RecentSearchesByUserFn != nil {
 		return m.RecentSearchesByUserFn(userID, limit)
+	}
+	return nil, nil
+}
+func (m *AnalyticsRepo) RecentViewedSongIDs(userID, limit int) ([]int, error) {
+	if m.RecentViewedSongIDsFn != nil {
+		return m.RecentViewedSongIDsFn(userID, limit)
 	}
 	return nil, nil
 }

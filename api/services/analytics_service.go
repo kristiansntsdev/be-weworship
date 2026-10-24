@@ -101,6 +101,10 @@ func (s *AnalyticsService) RecentSearches(userID, limit int) ([]string, error) {
 	return s.repo.RecentSearchesByUser(userID, limit)
 }
 
+func (s *AnalyticsService) RecentViewedSongIDs(userID, limit int) ([]int, error) {
+	return s.repo.RecentViewedSongIDs(userID, limit)
+}
+
 func (s *AnalyticsService) SessionsByPlatform(days int) (any, error) {
 	return s.repo.SessionsByPlatform(days)
 }

@@ -48,6 +48,7 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Get("/songs/export", ra, h.GetSongsExport)
 	api.Get("/songs/keys", h.GetSongKeys)
 	api.Get("/songs/search-history", ra, h.GetSongSearchHistory)
+	api.Get("/songs/view-history", ra, h.GetSongViewHistory)
 	api.Get("/favorites", ra, h.ListFavorites)
 	api.Post("/favorites/:songId/toggle", ra, h.ToggleFavorite)
 	api.Post("/favorites/:songId", ra, h.AddFavorite)

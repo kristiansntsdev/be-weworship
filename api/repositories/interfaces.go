@@ -145,6 +145,7 @@ type AnalyticsRepoIface interface {
 	DAU(days int) ([]DailyCountRow, error)
 	TopSearches(days, limit int) ([]TopSearchRow, error)
 	RecentSearchesByUser(userID, limit int) ([]string, error)
+	RecentViewedSongIDs(userID, limit int) ([]int, error)
 	SessionsByPlatform(days int) ([]PlatformBreakdownRow, error)
 	PerformanceSummary(days int) ([]PerfSummaryRow, error)
 	TotalUsers() (int, error)

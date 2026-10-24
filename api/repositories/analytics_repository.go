@@ -153,6 +153,24 @@ LIMIT ?`), userID, limit)
 	return rows, err
 }
 
+// RecentViewedSongIDs returns distinct songs the user opened, newest first.
+func (r *AnalyticsRepository) RecentViewedSongIDs(userID, limit int) ([]int, error) {
+	if limit < 1 {
+		limit = 10
+	}
+	ids := []int{}
+	err := r.db.Select(&ids, r.db.Rebind(`
+SELECT song_id FROM (
+  SELECT DISTINCT ON (song_id) song_id, "createdAt"
+  FROM song_events
+  WHERE user_id = ? AND event_type = 'view' AND song_id IS NOT NULL
+  ORDER BY song_id, "createdAt" DESC
+) t
+ORDER BY "createdAt" DESC
+LIMIT ?`), userID, limit)
+	return ids, err
+}
+
 type PlatformBreakdownRow struct {
 	Date     string `db:"date" json:"date"`
 	Platform string `db:"platform" json:"platform"`
