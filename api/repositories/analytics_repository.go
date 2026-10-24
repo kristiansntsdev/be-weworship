@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"database/sql"
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -17,6 +19,34 @@ func NewAnalyticsRepository(db *sqlx.DB) *AnalyticsRepository {
 func (r *AnalyticsRepository) RecordSongEvent(songID, userID *int, eventType, platform string, durationMs *int) {
 	r.db.Exec(r.db.Rebind(`INSERT INTO song_events (song_id,user_id,event_type,platform,duration_ms) VALUES (?,?,?,?,?)`),
 		songID, userID, eventType, platform, durationMs)
+}
+
+// RankedSongRow is a song ranked by song_events of a given type (view / add_to_playlist / …).
+type RankedSongRow struct {
+	ID     int            `db:"id"`
+	Title  string         `db:"title"`
+	Artist sql.NullString `db:"artist"`
+	Key    sql.NullString `db:"key"`
+	Count  int            `db:"count"`
+}
+
+// RankedSongs returns top songs by event_type. days=0 means all time.
+func (r *AnalyticsRepository) RankedSongs(eventType string, days, limit int) ([]RankedSongRow, error) {
+	if limit < 1 {
+		limit = 5
+	}
+	rows := []RankedSongRow{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+SELECT s.id, s.title, s.artist, s.base_chord AS key, COUNT(*)::int AS count
+FROM song_events e
+JOIN songs s ON s.id = e.song_id
+WHERE e.event_type = ?
+  AND e.song_id IS NOT NULL
+  AND (? = 0 OR e."createdAt" >= NOW() - (? * INTERVAL '1 day'))
+GROUP BY s.id, s.title, s.artist, s.base_chord
+ORDER BY count DESC, s.title ASC
+LIMIT ?`), eventType, days, days, limit)
+	return rows, err
 }
 
 func (r *AnalyticsRepository) RecordSearchLog(userID *int, query string, filtersJSON *string, resultsCount int, platform string) {

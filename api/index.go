@@ -74,14 +74,15 @@ func buildApp() (*fiber.App, error) {
 	tagSvc := services.NewTagService(tagRepo)
 	songEmbeddings := services.NewSongEmbeddingService(repositories.NewEmbeddingRepository(ctx.DB), providers.NewEmbedderFromEnv())
 	songSvc := services.NewSongService(songRepo, tagRepo, playlistRepo, songCache, songEmbeddings)
+	analyticsSvc := services.NewAnalyticsService(analyticsRepo)
 	playlistSvc := services.NewPlaylistService(
 		playlistRepo, teamRepo, songRepo, ctx.ClientURL, liveCache, authSvc,
 		os.Getenv("REALTIME_WS_URL"),
 		os.Getenv("REALTIME_INTERNAL_URL"),
+		analyticsSvc,
 	)
 	teamSvc := services.NewTeamService(teamRepo, authRepo, playlistRepo)
 	userSvc := services.NewUserService(userRepo)
-	analyticsSvc := services.NewAnalyticsService(analyticsRepo)
 	auditRepo := repositories.NewAuditRepository(ctx.DB)
 	auditSvc := services.NewAuditService(auditRepo)
 

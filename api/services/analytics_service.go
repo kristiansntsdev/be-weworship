@@ -2,8 +2,10 @@ package services
 
 import (
 	"encoding/json"
+	"strings"
 
 	"be-songbanks-v1/api/repositories"
+	"be-songbanks-v1/api/utils"
 )
 
 type AnalyticsService struct {
@@ -16,6 +18,34 @@ func NewAnalyticsService(repo *repositories.AnalyticsRepository) *AnalyticsServi
 
 func (s *AnalyticsService) RecordSongEvent(songID, userID *int, eventType, platform string, durationMs *int) {
 	s.repo.RecordSongEvent(songID, userID, eventType, platform, durationMs)
+}
+
+// RankedSongs returns top songs for home (popular views / most added). days=0 = all time.
+func (s *AnalyticsService) RankedSongs(eventType string, days, limit int) ([]map[string]any, error) {
+	rows, err := s.repo.RankedSongs(eventType, days, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, r := range rows {
+		artist := strings.Join(utils.ParseArtists(r.Artist.String), ", ")
+		var artistVal any
+		if artist != "" {
+			artistVal = artist
+		}
+		var keyVal any
+		if r.Key.Valid && strings.TrimSpace(r.Key.String) != "" {
+			keyVal = r.Key.String
+		}
+		out = append(out, map[string]any{
+			"id":     r.ID,
+			"title":  r.Title,
+			"artist": artistVal,
+			"key":    keyVal,
+			"count":  r.Count,
+		})
+	}
+	return out, nil
 }
 
 func (s *AnalyticsService) RecordSearch(userID *int, query string, filters map[string]any, resultsCount int, platform string) {

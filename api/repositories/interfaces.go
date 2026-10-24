@@ -131,6 +131,7 @@ type AnalyticsRepoIface interface {
 	RecordSearchLog(userID *int, query string, filtersJSON *string, resultsCount int, platform string)
 	RecordSession(userID *int, platform, appVersion, deviceOS string) error
 	RecordPerformance(userID *int, platform, metricType string, endpoint, screenName *string, durationMs, statusCode *int, appVersion, deviceOS string) error
+	RankedSongs(eventType string, days, limit int) ([]RankedSongRow, error)
 	TopSongs(days int, limit int) ([]TopSongRow, error)
 	NewUsersPerDay(days int) ([]DailyCountRow, error)
 	DAU(days int) ([]DailyCountRow, error)

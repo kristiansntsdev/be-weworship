@@ -19,6 +19,19 @@ func (h *Handler) GetHome(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.FailErr(c, 500, "Failed to retrieve home stats", err)
 	}
+	// Rankings from song_events (view → popular; add_to_playlist → most added). Empty until events exist.
+	if h.analytics != nil {
+		if popular, err := h.analytics.RankedSongs("view", 7, 5); err == nil {
+			stats["popular_songs"] = popular
+		} else {
+			stats["popular_songs"] = []any{}
+		}
+		if mostAdded, err := h.analytics.RankedSongs("add_to_playlist", 0, 5); err == nil {
+			stats["most_added_songs"] = mostAdded
+		} else {
+			stats["most_added_songs"] = []any{}
+		}
+	}
 	return utils.OK(c, 200, "Home stats retrieved successfully", stats)
 }
 
@@ -188,6 +201,7 @@ func (h *Handler) GetSongByID(c *fiber.Ctx) error {
 		if !found {
 			return utils.Fail(c, 404, "Song not found")
 		}
+		h.recordSongView(c, numID)
 		return utils.OK(c, 200, "Song details retrieved successfully", data)
 	}
 	data, found, err := h.songs.GetBySlug(identifier)
@@ -197,7 +211,30 @@ func (h *Handler) GetSongByID(c *fiber.Ctx) error {
 	if !found {
 		return utils.Fail(c, 404, "Song not found")
 	}
+	if id, ok := data["id"].(int); ok {
+		h.recordSongView(c, id)
+	} else if idf, ok := data["id"].(float64); ok {
+		h.recordSongView(c, int(idf))
+	}
 	return utils.OK(c, 200, "Song details retrieved successfully", data)
+}
+
+// recordSongView writes a fire-and-forget 'view' event for home popular rankings.
+func (h *Handler) recordSongView(c *fiber.Ctx, songID int) {
+	if h.analytics == nil || songID < 1 {
+		return
+	}
+	var userID *int
+	if cl := middleware.GetClaims(c); cl != nil {
+		id := cl.UserID
+		userID = &id
+	}
+	platform := "web"
+	if isMobileUserAgent(c.Get("User-Agent")) {
+		platform = "mobile"
+	}
+	sid := songID
+	h.analytics.RecordSongEvent(&sid, userID, "view", platform, nil)
 }
 
 func (h *Handler) CreateSong(c *fiber.Ctx) error {

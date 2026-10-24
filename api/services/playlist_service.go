@@ -14,21 +14,23 @@ import (
 )
 
 type PlaylistService struct {
-	playlists            repositories.PlaylistRepoIface
-	teams                repositories.TeamRepoIface
-	songs                repositories.SongRepoIface
-	clientURL            string
-	live                 platform.LiveCacheIface
-	auth                 *AuthService
-	realtimeWSURL        string
-	realtimeInternalURL  string
+	playlists           repositories.PlaylistRepoIface
+	teams               repositories.TeamRepoIface
+	songs               repositories.SongRepoIface
+	analytics           *AnalyticsService // nil-safe; records add_to_playlist events
+	clientURL           string
+	live                platform.LiveCacheIface
+	auth                *AuthService
+	realtimeWSURL       string
+	realtimeInternalURL string
 }
 
-func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.TeamRepository, s *repositories.SongRepository, clientURL string, live *platform.LiveCache, auth *AuthService, realtimeWSURL, realtimeInternalURL string) *PlaylistService {
+func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.TeamRepository, s *repositories.SongRepository, clientURL string, live *platform.LiveCache, auth *AuthService, realtimeWSURL, realtimeInternalURL string, analytics *AnalyticsService) *PlaylistService {
 	return &PlaylistService{
 		playlists:           p,
 		teams:               t,
 		songs:               s,
+		analytics:           analytics,
 		clientURL:           clientURL,
 		live:                live,
 		auth:                auth,
@@ -52,6 +54,7 @@ func (s *PlaylistService) Create(userID int, name string, songs []int) (map[stri
 	if err != nil {
 		return nil, 500, err
 	}
+	s.recordPlaylistAdds(userID, songs)
 	return map[string]any{"id": id, "playlist_name": name, "user_id": userID, "songs": songs}, 201, nil
 }
 
@@ -220,9 +223,11 @@ func (s *PlaylistService) AddSongs(playlistID, userID int, songIDs []int) (int, 
 	if !canManage {
 		return 403, fmt.Errorf("access denied")
 	}
-	if err := s.appendSongs(playlistID, songIDs); err != nil {
+	added, err := s.appendSongs(playlistID, songIDs)
+	if err != nil {
 		return 500, err
 	}
+	s.recordPlaylistAdds(userID, added)
 	s.touchLiveContent(playlistID)
 	return 200, nil
 }
@@ -238,12 +243,14 @@ func (s *PlaylistService) AddSongWithBaseChord(playlistID, userID, songID int, b
 	if !ok {
 		return 403, fmt.Errorf("access denied")
 	}
-	if err := s.appendSongs(playlistID, []int{songID}); err != nil {
+	added, err := s.appendSongs(playlistID, []int{songID})
+	if err != nil {
 		return 500, err
 	}
 	if err := s.playlists.SetSongKey(playlistID, songID, strings.TrimSpace(baseChord)); err != nil {
 		return 500, err
 	}
+	s.recordPlaylistAdds(userID, added)
 	s.touchLiveContent(playlistID)
 	return 200, nil
 }
@@ -338,16 +345,18 @@ func (s *PlaylistService) RemoveSong(playlistID, userID, songID int) (int, error
 	return 200, nil
 }
 
-func (s *PlaylistService) appendSongs(playlistID int, songIDs []int) error {
+// appendSongs adds missing songs and returns only the newly added IDs.
+func (s *PlaylistService) appendSongs(playlistID int, songIDs []int) ([]int, error) {
 	pl, err := s.playlists.GetByID(playlistID)
 	if err != nil || pl == nil {
-		return fmt.Errorf("playlist not found")
+		return nil, fmt.Errorf("playlist not found")
 	}
 	songs := utils.ParseIntSlice(pl.SongsRaw.String)
 	set := map[int]struct{}{}
 	for _, id := range songs {
 		set[id] = struct{}{}
 	}
+	added := make([]int, 0, len(songIDs))
 	for _, id := range songIDs {
 		exists, err := s.songs.ExistsByID(id)
 		if err != nil || !exists {
@@ -356,9 +365,24 @@ func (s *PlaylistService) appendSongs(playlistID int, songIDs []int) error {
 		if _, ok := set[id]; !ok {
 			songs = append(songs, id)
 			set[id] = struct{}{}
+			added = append(added, id)
 		}
 	}
-	return s.playlists.SetSongs(playlistID, songs)
+	if err := s.playlists.SetSongs(playlistID, songs); err != nil {
+		return nil, err
+	}
+	return added, nil
+}
+
+func (s *PlaylistService) recordPlaylistAdds(userID int, songIDs []int) {
+	if s.analytics == nil || len(songIDs) == 0 {
+		return
+	}
+	uid := userID
+	for _, songID := range songIDs {
+		sid := songID
+		s.analytics.RecordSongEvent(&sid, &uid, "add_to_playlist", "web", nil)
+	}
 }
 
 func (s *PlaylistService) loadWithAccess(playlistID, userID int) (*models.Playlist, string, error) {
