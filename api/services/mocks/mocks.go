@@ -683,6 +683,40 @@ func (m *NotificationRepo) CountUnread(userID int) (int, error) {
 	return 0, nil
 }
 
+// ── FavoriteRepo ──────────────────────────────────────────────────────────────
+
+type FavoriteRepo struct {
+	AddFn         func(int, int) error
+	RemoveFn      func(int, int) error
+	IsFavoriteFn  func(int, int) (bool, error)
+	ListSongIDsFn func(int) ([]int, error)
+}
+
+func (m *FavoriteRepo) Add(userID, songID int) error {
+	if m.AddFn != nil {
+		return m.AddFn(userID, songID)
+	}
+	return nil
+}
+func (m *FavoriteRepo) Remove(userID, songID int) error {
+	if m.RemoveFn != nil {
+		return m.RemoveFn(userID, songID)
+	}
+	return nil
+}
+func (m *FavoriteRepo) IsFavorite(userID, songID int) (bool, error) {
+	if m.IsFavoriteFn != nil {
+		return m.IsFavoriteFn(userID, songID)
+	}
+	return false, nil
+}
+func (m *FavoriteRepo) ListSongIDs(userID int) ([]int, error) {
+	if m.ListSongIDsFn != nil {
+		return m.ListSongIDsFn(userID)
+	}
+	return nil, nil
+}
+
 // ── AnalyticsRepo ─────────────────────────────────────────────────────────────
 
 type AnalyticsRepo struct {

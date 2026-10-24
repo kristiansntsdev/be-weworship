@@ -201,6 +201,7 @@ func (h *Handler) GetSongByID(c *fiber.Ctx) error {
 		if !found {
 			return utils.Fail(c, 404, "Song not found")
 		}
+		h.attachFavoriteFlag(c, data, numID)
 		h.recordSongView(c, numID)
 		return utils.OK(c, 200, "Song details retrieved successfully", data)
 	}
@@ -211,12 +212,103 @@ func (h *Handler) GetSongByID(c *fiber.Ctx) error {
 	if !found {
 		return utils.Fail(c, 404, "Song not found")
 	}
-	if id, ok := data["id"].(int); ok {
-		h.recordSongView(c, id)
-	} else if idf, ok := data["id"].(float64); ok {
-		h.recordSongView(c, int(idf))
+	songID := songIDFromMap(data)
+	if songID > 0 {
+		h.attachFavoriteFlag(c, data, songID)
+		h.recordSongView(c, songID)
 	}
 	return utils.OK(c, 200, "Song details retrieved successfully", data)
+}
+
+func songIDFromMap(data map[string]any) int {
+	switch v := data["id"].(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	default:
+		return 0
+	}
+}
+
+func (h *Handler) attachFavoriteFlag(c *fiber.Ctx, data map[string]any, songID int) {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		data["is_favorite"] = false
+		return
+	}
+	ok, err := h.songs.IsFavorite(cl.UserID, songID)
+	if err != nil {
+		data["is_favorite"] = false
+		return
+	}
+	data["is_favorite"] = ok
+}
+
+func (h *Handler) ListFavorites(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Access token required")
+	}
+	data, err := h.songs.ListFavorites(cl.UserID)
+	if err != nil {
+		return utils.FailErr(c, 500, "Failed to list favorites", err)
+	}
+	return utils.OK(c, 200, "Favorites retrieved", data)
+}
+
+func (h *Handler) ToggleFavorite(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Access token required")
+	}
+	songID, err := parseID(c, "songId")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid song ID")
+	}
+	favorited, err := h.songs.ToggleFavorite(cl.UserID, songID)
+	if err != nil {
+		if err.Error() == "song not found" {
+			return utils.Fail(c, 404, "Song not found")
+		}
+		return utils.FailErr(c, 500, "Failed to update favorite", err)
+	}
+	return utils.OK(c, 200, "Favorite updated", fiber.Map{"song_id": songID, "is_favorite": favorited})
+}
+
+func (h *Handler) AddFavorite(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Access token required")
+	}
+	songID, err := parseID(c, "songId")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid song ID")
+	}
+	if err := h.songs.AddFavorite(cl.UserID, songID); err != nil {
+		if err.Error() == "song not found" {
+			return utils.Fail(c, 404, "Song not found")
+		}
+		return utils.FailErr(c, 500, "Failed to add favorite", err)
+	}
+	return utils.OK(c, 200, "Favorite added", fiber.Map{"song_id": songID, "is_favorite": true})
+}
+
+func (h *Handler) RemoveFavorite(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	if cl == nil {
+		return utils.Fail(c, 401, "Access token required")
+	}
+	songID, err := parseID(c, "songId")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid song ID")
+	}
+	if err := h.songs.RemoveFavorite(cl.UserID, songID); err != nil {
+		return utils.FailErr(c, 500, "Failed to remove favorite", err)
+	}
+	return utils.OK(c, 200, "Favorite removed", fiber.Map{"song_id": songID, "is_favorite": false})
 }
 
 // recordSongView writes a fire-and-forget 'view' event for home popular rankings.

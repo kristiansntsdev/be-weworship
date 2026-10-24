@@ -20,13 +20,15 @@ type SongService struct {
 	songs      repositories.SongRepoIface
 	tags       repositories.TagRepoIface
 	playlists  repositories.PlaylistRepoIface
+	favorites  repositories.FavoriteRepoIface // nil-safe
 	cache      platform.SongCacheIface
 	embeddings *SongEmbeddingService // nil = semantic search disabled
 }
 
 // embeddings may be nil (no embedding service configured): search then ranks by text only.
-func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories.TagRepository, playlistRepo *repositories.PlaylistRepository, cache *platform.SongCache, embeddings *SongEmbeddingService) *SongService {
-	return &SongService{songs: songRepo, tags: tagRepo, playlists: playlistRepo, cache: cache, embeddings: embeddings}
+// favorites may be nil (favorites disabled).
+func NewSongService(songRepo *repositories.SongRepository, tagRepo *repositories.TagRepository, playlistRepo *repositories.PlaylistRepository, cache *platform.SongCache, embeddings *SongEmbeddingService, favorites repositories.FavoriteRepoIface) *SongService {
+	return &SongService{songs: songRepo, tags: tagRepo, playlists: playlistRepo, cache: cache, embeddings: embeddings, favorites: favorites}
 }
 
 const (
@@ -751,4 +753,107 @@ func (s *SongService) DeleteSongReport(id, userID int) error {
 
 func (s *SongService) GetSongReportByID(id int) (*models.SongReport, bool, error) {
 	return s.songs.GetSongReportByID(id)
+}
+
+// ── Favorites ────────────────────────────────────────────────────────────────
+
+func (s *SongService) IsFavorite(userID, songID int) (bool, error) {
+	if s.favorites == nil {
+		return false, nil
+	}
+	return s.favorites.IsFavorite(userID, songID)
+}
+
+func (s *SongService) AddFavorite(userID, songID int) error {
+	if s.favorites == nil {
+		return fmt.Errorf("favorites unavailable")
+	}
+	exists, err := s.songs.ExistsByID(songID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("song not found")
+	}
+	return s.favorites.Add(userID, songID)
+}
+
+func (s *SongService) RemoveFavorite(userID, songID int) error {
+	if s.favorites == nil {
+		return fmt.Errorf("favorites unavailable")
+	}
+	return s.favorites.Remove(userID, songID)
+}
+
+// ToggleFavorite returns the new favorited state.
+func (s *SongService) ToggleFavorite(userID, songID int) (bool, error) {
+	if s.favorites == nil {
+		return false, fmt.Errorf("favorites unavailable")
+	}
+	exists, err := s.songs.ExistsByID(songID)
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, fmt.Errorf("song not found")
+	}
+	ok, err := s.favorites.IsFavorite(userID, songID)
+	if err != nil {
+		return false, err
+	}
+	if ok {
+		return false, s.favorites.Remove(userID, songID)
+	}
+	if err := s.favorites.Add(userID, songID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *SongService) ListFavorites(userID int) ([]map[string]any, error) {
+	if s.favorites == nil {
+		return []map[string]any{}, nil
+	}
+	ids, err := s.favorites.ListSongIDs(userID)
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return []map[string]any{}, nil
+	}
+	rows, err := s.songs.ListByIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[int]models.Song, len(rows))
+	for _, r := range rows {
+		byID[r.ID] = r
+	}
+	out := make([]map[string]any, 0, len(ids))
+	for _, id := range ids {
+		row, ok := byID[id]
+		if !ok {
+			continue
+		}
+		tags, _ := s.tags.GetTagsForSong(row.ID)
+		tagRows := make([]map[string]any, 0, len(tags))
+		for _, t := range tags {
+			tagRows = append(tagRows, map[string]any{"id": t.ID, "name": t.Name, "description": utils.NullableString(t.Description)})
+		}
+		sp, yt, am := parseExternalLinks(row.ExternalLinks.String)
+		out = append(out, map[string]any{
+			"id":                row.ID,
+			"slug":              utils.NullableString(row.Slug),
+			"title":             row.Title,
+			"artist":            utils.ParseArtists(row.Artist.String),
+			"base_chord":        utils.NullableString(row.BaseChord),
+			"lyrics_and_chords": utils.NullableString(row.LyricsAndChord),
+			"spotify_url":       sp,
+			"youtube_url":       yt,
+			"apple_music_url":   am,
+			"tags":              tagRows,
+			"is_favorite":       true,
+		})
+	}
+	return out, nil
 }

@@ -73,7 +73,8 @@ func buildApp() (*fiber.App, error) {
 	})
 	tagSvc := services.NewTagService(tagRepo)
 	songEmbeddings := services.NewSongEmbeddingService(repositories.NewEmbeddingRepository(ctx.DB), providers.NewEmbedderFromEnv())
-	songSvc := services.NewSongService(songRepo, tagRepo, playlistRepo, songCache, songEmbeddings)
+	favoriteRepo := repositories.NewFavoriteRepository(ctx.DB)
+	songSvc := services.NewSongService(songRepo, tagRepo, playlistRepo, songCache, songEmbeddings, favoriteRepo)
 	analyticsSvc := services.NewAnalyticsService(analyticsRepo)
 	playlistSvc := services.NewPlaylistService(
 		playlistRepo, teamRepo, songRepo, ctx.ClientURL, liveCache, authSvc,

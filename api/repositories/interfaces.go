@@ -18,6 +18,14 @@ type AuthRepoIface interface {
 	UpdateUsername(id int, username string) (*models.User, error)
 }
 
+// FavoriteRepoIface abstracts FavoriteRepository for testing.
+type FavoriteRepoIface interface {
+	Add(userID, songID int) error
+	Remove(userID, songID int) error
+	IsFavorite(userID, songID int) (bool, error)
+	ListSongIDs(userID int) ([]int, error)
+}
+
 // SongRepoIface abstracts SongRepository for testing.
 type SongRepoIface interface {
 	List(page, limit int, search, baseChord, sortBy, sortOrder string, tagIDs []int, keys, artists []string, hasLink, chordPro *bool) ([]models.Song, int, error)
