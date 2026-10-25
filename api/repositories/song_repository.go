@@ -317,7 +317,7 @@ func (r *SongRepository) Count() (int, error) {
 	return n, err
 }
 
-// ListRecent returns the newest playable (ChordPro, non-DMCA) songs by createdAt.
+// ListRecent returns playable (ChordPro, non-DMCA) songs created in the last 30 days, newest first.
 func (r *SongRepository) ListRecent(limit int) ([]models.Song, error) {
 	if limit < 1 {
 		limit = 8
@@ -329,6 +329,7 @@ func (r *SongRepository) ListRecent(limit int) ([]models.Song, error) {
 		FROM songs
 		WHERE (lyrics_and_chords LIKE '%[%' AND lyrics_and_chords NOT LIKE '%<span%')
 		  AND dmca_takedown = false
+		  AND "createdAt" >= NOW() - INTERVAL '30 days'
 		ORDER BY "createdAt" DESC, id DESC
 		LIMIT ?`), limit)
 	return rows, err
