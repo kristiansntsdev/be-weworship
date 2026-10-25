@@ -317,6 +317,23 @@ func (r *SongRepository) Count() (int, error) {
 	return n, err
 }
 
+// ListRecent returns the newest playable (ChordPro, non-DMCA) songs by createdAt.
+func (r *SongRepository) ListRecent(limit int) ([]models.Song, error) {
+	if limit < 1 {
+		limit = 8
+	}
+	rows := []models.Song{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+		SELECT id, slug, title, artist, base_chord, bpm, lyrics_and_chords, external_links,
+		       dmca_takedown, dmca_status_notes, "createdAt", "updatedAt"
+		FROM songs
+		WHERE (lyrics_and_chords LIKE '%[%' AND lyrics_and_chords NOT LIKE '%<span%')
+		  AND dmca_takedown = false
+		ORDER BY "createdAt" DESC, id DESC
+		LIMIT ?`), limit)
+	return rows, err
+}
+
 func (r *SongRepository) ListAllChordPro() ([]models.Song, error) {
 	rows := []models.Song{}
 	err := r.db.Select(&rows, `SELECT id,slug,title,artist,base_chord,bpm,lyrics_and_chords,external_links,dmca_takedown,dmca_status_notes,"createdAt","updatedAt" FROM songs WHERE (lyrics_and_chords LIKE '%[%' AND lyrics_and_chords NOT LIKE '%<span%') AND dmca_takedown = false ORDER BY title ASC`)

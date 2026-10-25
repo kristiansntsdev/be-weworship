@@ -113,11 +113,34 @@ func (s *SongService) HomeStats() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	recentSongs := []map[string]any{}
+	if rows, err := s.songs.ListRecent(8); err == nil {
+		recentSongs = make([]map[string]any, 0, len(rows))
+		for _, r := range rows {
+			artist := strings.Join(utils.ParseArtists(r.Artist.String), ", ")
+			var artistVal any
+			if artist != "" {
+				artistVal = artist
+			}
+			var keyVal any
+			if r.BaseChord.Valid && strings.TrimSpace(r.BaseChord.String) != "" {
+				keyVal = r.BaseChord.String
+			}
+			recentSongs = append(recentSongs, map[string]any{
+				"id":        r.ID,
+				"title":     r.Title,
+				"artist":    artistVal,
+				"key":       keyVal,
+				"createdAt": utils.NullableTime(r.CreatedAt),
+			})
+		}
+	}
 	return map[string]any{
 		"song_count":               songCount,
 		"artist_count":             len(artists),
 		"shareable_playlist_count": shareableCount,
 		"weekly_share_count":       weeklyShareCount,
+		"recent_songs":             recentSongs,
 	}, nil
 }
 

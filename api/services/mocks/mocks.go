@@ -84,6 +84,7 @@ type SongRepo struct {
 	ExistsByIDFn              func(int) (bool, error)
 	ListArtistsRawFn          func() ([]string, error)
 	CountFn                   func() (int, error)
+	ListRecentFn              func(int) ([]models.Song, error)
 	ListAllChordProFn         func() ([]models.Song, error)
 	CreateSongRequestFn       func(int, string, string, string, string) (*models.SongRequest, error)
 	ListSongRequestsFn        func(string, int, int) ([]models.SongRequest, int, error)
@@ -183,6 +184,12 @@ func (m *SongRepo) Count() (int, error) {
 		return m.CountFn()
 	}
 	return 0, nil
+}
+func (m *SongRepo) ListRecent(limit int) ([]models.Song, error) {
+	if m.ListRecentFn != nil {
+		return m.ListRecentFn(limit)
+	}
+	return nil, nil
 }
 func (m *SongRepo) ListAllChordPro() ([]models.Song, error) {
 	if m.ListAllChordProFn != nil {

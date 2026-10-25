@@ -1,7 +1,9 @@
 package services
 
 import (
+	"database/sql"
 	"testing"
+	"time"
 
 	"be-songbanks-v1/api/models"
 	"be-songbanks-v1/api/services/mocks"
@@ -417,4 +419,38 @@ func TestBuildSongsCacheKey_DistinguishesFiltersButNotTheirOrder(t *testing.T) {
 	assert.Equal(t, withKeys, reordered)
 	assert.NotEqual(t, base, withArtist)
 	assert.NotEqual(t, withKeys, withArtist)
+}
+
+func TestSongService_HomeStats_IncludesRecentSongs(t *testing.T) {
+	created := time.Date(2026, 10, 25, 4, 0, 0, 0, time.UTC)
+	mockSongs := &mocks.SongRepo{
+		CountFn:          func() (int, error) { return 3, nil },
+		ListArtistsRawFn: func() ([]string, error) { return []string{`["Hillsong"]`}, nil },
+		ListRecentFn: func(limit int) ([]models.Song, error) {
+			assert.Equal(t, 8, limit)
+			return []models.Song{{
+				ID:        7,
+				Title:     "New Song",
+				Artist:    sql.NullString{String: `["Hillsong"]`, Valid: true},
+				BaseChord: sql.NullString{String: "G", Valid: true},
+				CreatedAt: sql.NullTime{Time: created, Valid: true},
+			}}, nil
+		},
+	}
+	mockPlaylists := &mocks.PlaylistRepo{
+		CountShareableFn:           func() (int, error) { return 1, nil },
+		CountShareEventsThisWeekFn: func() (int, error) { return 2, nil },
+	}
+	svc := &SongService{songs: mockSongs, playlists: mockPlaylists}
+	stats, err := svc.HomeStats()
+
+	require.NoError(t, err)
+	assert.Equal(t, 3, stats["song_count"])
+	recent, ok := stats["recent_songs"].([]map[string]any)
+	require.True(t, ok)
+	require.Len(t, recent, 1)
+	assert.Equal(t, 7, recent[0]["id"])
+	assert.Equal(t, "New Song", recent[0]["title"])
+	assert.Equal(t, "Hillsong", recent[0]["artist"])
+	assert.Equal(t, "G", recent[0]["key"])
 }

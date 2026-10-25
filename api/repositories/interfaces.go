@@ -42,6 +42,7 @@ type SongRepoIface interface {
 	ListArtistsRaw() ([]string, error)
 	ListKeyCounts() ([]KeyCount, error)
 	Count() (int, error)
+	ListRecent(limit int) ([]models.Song, error)
 	ListAllChordPro() ([]models.Song, error)
 	CreateSongRequest(userID int, songTitle, referenceLink, lyricsType, lyrics string) (*models.SongRequest, error)
 	ListSongRequests(status string, page, limit int) ([]models.SongRequest, int, error)
