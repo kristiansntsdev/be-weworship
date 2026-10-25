@@ -91,6 +91,112 @@ func (r *UserRepository) UpdateRole(userID int, role string) (*models.User, erro
 	return &u, nil
 }
 
+func (r *UserRepository) UpdateVerified(userID int, verified bool) (*models.User, error) {
+	var u models.User
+	err := r.db.Get(
+		&u,
+		`UPDATE users SET verified = $1, "updatedAt" = NOW() WHERE id = $2 RETURNING id, username, email, role, provider, verified, status, avatar_url, "createdAt", "updatedAt"`,
+		verified,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UserRepository) CreateVerificationRequest(userID int, displayName, proofLink string, note *string) (*models.VerificationRequest, error) {
+	var row models.VerificationRequest
+	err := r.db.Get(
+		&row,
+		`INSERT INTO verification_requests (user_id, display_name, proof_link, note)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, user_id, display_name, proof_link, note, status, admin_notes, "createdAt", "updatedAt"`,
+		userID, displayName, proofLink, note,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *UserRepository) GetLatestVerificationRequest(userID int) (*models.VerificationRequest, error) {
+	var row models.VerificationRequest
+	err := r.db.Get(
+		&row,
+		`SELECT id, user_id, display_name, proof_link, note, status, admin_notes, "createdAt", "updatedAt"
+		 FROM verification_requests WHERE user_id = $1 ORDER BY "createdAt" DESC LIMIT 1`,
+		userID,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *UserRepository) HasPendingVerificationRequest(userID int) (bool, error) {
+	var n int
+	err := r.db.Get(&n, `SELECT COUNT(*) FROM verification_requests WHERE user_id = $1 AND status = 'pending'`, userID)
+	return n > 0, err
+}
+
+func (r *UserRepository) CountVerificationRequests(status string) (int, error) {
+	where := `WHERE 1=1`
+	args := []any{}
+	if status != "" {
+		where += ` AND status = ?`
+		args = append(args, status)
+	}
+	var total int
+	err := r.db.Get(&total, r.db.Rebind(`SELECT COUNT(*) FROM verification_requests `+where), args...)
+	return total, err
+}
+
+func (r *UserRepository) ListVerificationRequests(status string, page, limit int) ([]models.VerificationRequest, error) {
+	offset := (page - 1) * limit
+	where := `WHERE 1=1`
+	args := []any{}
+	if status != "" {
+		where += ` AND vr.status = ?`
+		args = append(args, status)
+	}
+	query := r.db.Rebind(`
+		SELECT vr.id, vr.user_id, vr.display_name, vr.proof_link, vr.note, vr.status, vr.admin_notes,
+		       vr."createdAt", vr."updatedAt", u.username, u.email
+		FROM verification_requests vr
+		JOIN users u ON u.id = vr.user_id
+		` + where + ` ORDER BY vr."createdAt" DESC LIMIT ? OFFSET ?`)
+	args = append(args, limit, offset)
+	rows := []models.VerificationRequest{}
+	err := r.db.Select(&rows, query, args...)
+	return rows, err
+}
+
+func (r *UserRepository) GetVerificationRequestByID(id int) (*models.VerificationRequest, error) {
+	var row models.VerificationRequest
+	err := r.db.Get(
+		&row,
+		`SELECT id, user_id, display_name, proof_link, note, status, admin_notes, "createdAt", "updatedAt"
+		 FROM verification_requests WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *UserRepository) UpdateVerificationRequestStatus(id int, status, adminNotes string) error {
+	_, err := r.db.Exec(
+		`UPDATE verification_requests SET status = $1, admin_notes = $2, "updatedAt" = NOW() WHERE id = $3`,
+		status, adminNotes, id,
+	)
+	return err
+}
+
 func (r *UserRepository) UpdateAvatarURL(userID int, avatarURL string) error {
 	_, err := r.db.Exec(`UPDATE users SET avatar_url = $1, "updatedAt" = NOW() WHERE id = $2`, avatarURL, userID)
 	return err

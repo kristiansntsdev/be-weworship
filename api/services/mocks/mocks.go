@@ -548,15 +548,23 @@ func (m *TagRepo) GetTagsForSongs(songIDs []int) (map[int][]models.Tag, error) {
 // ── UserRepo ──────────────────────────────────────────────────────────────────
 
 type UserRepo struct {
-	CountFn                 func(string) (int, error)
-	ListFn                  func(string, int, int) ([]models.User, error)
-	GetDetailFn             func(int) (*models.UserDetail, error)
-	UpsertDetailFn          func(int, *string, *string, *string, *string) error
-	FindByIDFn              func(int) (*models.User, error)
-	UpdateRoleFn            func(int, string) (*models.User, error)
-	UpdateAvatarURLFn       func(int, string) error
-	FindByEmailFn           func(string) (*models.User, error)
-	CreateDeletionRequestFn func(string, *int, string) error
+	CountFn                          func(string) (int, error)
+	ListFn                           func(string, int, int) ([]models.User, error)
+	GetDetailFn                      func(int) (*models.UserDetail, error)
+	UpsertDetailFn                   func(int, *string, *string, *string, *string) error
+	FindByIDFn                       func(int) (*models.User, error)
+	UpdateRoleFn                     func(int, string) (*models.User, error)
+	UpdateVerifiedFn                 func(int, bool) (*models.User, error)
+	UpdateAvatarURLFn                func(int, string) error
+	FindByEmailFn                    func(string) (*models.User, error)
+	CreateDeletionRequestFn          func(string, *int, string) error
+	CreateVerificationRequestFn      func(int, string, string, *string) (*models.VerificationRequest, error)
+	GetLatestVerificationRequestFn   func(int) (*models.VerificationRequest, error)
+	HasPendingVerificationRequestFn  func(int) (bool, error)
+	CountVerificationRequestsFn      func(string) (int, error)
+	ListVerificationRequestsFn       func(string, int, int) ([]models.VerificationRequest, error)
+	GetVerificationRequestByIDFn     func(int) (*models.VerificationRequest, error)
+	UpdateVerificationRequestStatusFn func(int, string, string) error
 }
 
 func (m *UserRepo) Count(search string) (int, error) {
@@ -595,6 +603,12 @@ func (m *UserRepo) UpdateRole(userID int, role string) (*models.User, error) {
 	}
 	return nil, nil
 }
+func (m *UserRepo) UpdateVerified(userID int, verified bool) (*models.User, error) {
+	if m.UpdateVerifiedFn != nil {
+		return m.UpdateVerifiedFn(userID, verified)
+	}
+	return nil, nil
+}
 func (m *UserRepo) UpdateAvatarURL(userID int, avatarURL string) error {
 	if m.UpdateAvatarURLFn != nil {
 		return m.UpdateAvatarURLFn(userID, avatarURL)
@@ -610,6 +624,48 @@ func (m *UserRepo) FindByEmail(email string) (*models.User, error) {
 func (m *UserRepo) CreateDeletionRequest(email string, userID *int, ipAddress string) error {
 	if m.CreateDeletionRequestFn != nil {
 		return m.CreateDeletionRequestFn(email, userID, ipAddress)
+	}
+	return nil
+}
+func (m *UserRepo) CreateVerificationRequest(userID int, displayName, proofLink string, note *string) (*models.VerificationRequest, error) {
+	if m.CreateVerificationRequestFn != nil {
+		return m.CreateVerificationRequestFn(userID, displayName, proofLink, note)
+	}
+	return nil, nil
+}
+func (m *UserRepo) GetLatestVerificationRequest(userID int) (*models.VerificationRequest, error) {
+	if m.GetLatestVerificationRequestFn != nil {
+		return m.GetLatestVerificationRequestFn(userID)
+	}
+	return nil, nil
+}
+func (m *UserRepo) HasPendingVerificationRequest(userID int) (bool, error) {
+	if m.HasPendingVerificationRequestFn != nil {
+		return m.HasPendingVerificationRequestFn(userID)
+	}
+	return false, nil
+}
+func (m *UserRepo) CountVerificationRequests(status string) (int, error) {
+	if m.CountVerificationRequestsFn != nil {
+		return m.CountVerificationRequestsFn(status)
+	}
+	return 0, nil
+}
+func (m *UserRepo) ListVerificationRequests(status string, page, limit int) ([]models.VerificationRequest, error) {
+	if m.ListVerificationRequestsFn != nil {
+		return m.ListVerificationRequestsFn(status, page, limit)
+	}
+	return nil, nil
+}
+func (m *UserRepo) GetVerificationRequestByID(id int) (*models.VerificationRequest, error) {
+	if m.GetVerificationRequestByIDFn != nil {
+		return m.GetVerificationRequestByIDFn(id)
+	}
+	return nil, nil
+}
+func (m *UserRepo) UpdateVerificationRequestStatus(id int, status, adminNotes string) error {
+	if m.UpdateVerificationRequestStatusFn != nil {
+		return m.UpdateVerificationRequestStatusFn(id, status, adminNotes)
 	}
 	return nil
 }

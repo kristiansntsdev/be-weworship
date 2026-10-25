@@ -35,3 +35,19 @@ type UserBasic struct {
 	Username string `db:"username" json:"username"`
 	Email    string `db:"email" json:"email"`
 }
+
+// VerificationRequest is a user application to become an official (verified) account.
+type VerificationRequest struct {
+	ID          int            `db:"id"           json:"id"`
+	UserID      int            `db:"user_id"      json:"user_id"`
+	DisplayName string         `db:"display_name" json:"display_name"`
+	ProofLink   string         `db:"proof_link"   json:"proof_link"`
+	Note        sql.NullString `db:"note"         json:"-"`
+	Status      string         `db:"status"       json:"status"`
+	AdminNotes  sql.NullString `db:"admin_notes"  json:"-"`
+	CreatedAt   time.Time      `db:"createdAt"    json:"createdAt"`
+	UpdatedAt   time.Time      `db:"updatedAt"    json:"updatedAt"`
+	// Joined from users for admin list (empty for user-facing reads).
+	Username string `db:"username" json:"username,omitempty"`
+	Email    string `db:"email"    json:"email,omitempty"`
+}

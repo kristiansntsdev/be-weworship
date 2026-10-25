@@ -115,9 +115,17 @@ type UserRepoIface interface {
 	UpsertDetail(userID int, fullName, province, city, postalCode *string) error
 	FindByID(userID int) (*models.User, error)
 	UpdateRole(userID int, role string) (*models.User, error)
+	UpdateVerified(userID int, verified bool) (*models.User, error)
 	UpdateAvatarURL(userID int, avatarURL string) error
 	FindByEmail(email string) (*models.User, error)
 	CreateDeletionRequest(email string, userID *int, ipAddress string) error
+	CreateVerificationRequest(userID int, displayName, proofLink string, note *string) (*models.VerificationRequest, error)
+	GetLatestVerificationRequest(userID int) (*models.VerificationRequest, error)
+	HasPendingVerificationRequest(userID int) (bool, error)
+	CountVerificationRequests(status string) (int, error)
+	ListVerificationRequests(status string, page, limit int) ([]models.VerificationRequest, error)
+	GetVerificationRequestByID(id int) (*models.VerificationRequest, error)
+	UpdateVerificationRequestStatus(id int, status, adminNotes string) error
 }
 
 // NotificationRepoIface abstracts NotificationRepository for testing.

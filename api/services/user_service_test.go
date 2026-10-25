@@ -201,3 +201,65 @@ func TestUserService_RequestDeletion_UserNotFound(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, receivedUserID, "userID must be nil for anonymous deletion requests")
 }
+
+// ── UpdateVerified ────────────────────────────────────────────────────────────
+
+func TestUserService_UpdateVerified_Success(t *testing.T) {
+	mockRepo := &mocks.UserRepo{
+		UpdateVerifiedFn: func(userID int, verified bool) (*models.User, error) {
+			return &models.User{ID: userID, Verified: verified}, nil
+		},
+	}
+	svc := &UserService{repo: mockRepo}
+	user, status, err := svc.UpdateVerified(3, true)
+	require.NoError(t, err)
+	assert.Equal(t, 200, status)
+	require.NotNil(t, user)
+	assert.True(t, user.Verified)
+}
+
+func TestUserService_UpdateVerified_NotFound(t *testing.T) {
+	mockRepo := &mocks.UserRepo{
+		UpdateVerifiedFn: func(int, bool) (*models.User, error) { return nil, sql.ErrNoRows },
+	}
+	svc := &UserService{repo: mockRepo}
+	user, status, err := svc.UpdateVerified(404, true)
+	require.Error(t, err)
+	assert.Nil(t, user)
+	assert.Equal(t, 404, status)
+}
+
+// ── Verification requests ─────────────────────────────────────────────────────
+
+func TestUserService_UpdateVerificationRequestStatus_ApproveSetsVerified(t *testing.T) {
+	verifiedSet := false
+	mockRepo := &mocks.UserRepo{
+		GetVerificationRequestByIDFn: func(id int) (*models.VerificationRequest, error) {
+			return &models.VerificationRequest{ID: id, UserID: 9, Status: "pending"}, nil
+		},
+		UpdateVerificationRequestStatusFn: func(int, string, string) error { return nil },
+		UpdateVerifiedFn: func(userID int, verified bool) (*models.User, error) {
+			assert.Equal(t, 9, userID)
+			assert.True(t, verified)
+			verifiedSet = true
+			return &models.User{ID: userID, Verified: true}, nil
+		},
+	}
+	svc := &UserService{repo: mockRepo}
+	status, err := svc.UpdateVerificationRequestStatus(1, "approved", "looks legit")
+	require.NoError(t, err)
+	assert.Equal(t, 200, status)
+	assert.True(t, verifiedSet)
+}
+
+func TestUserService_CreateVerificationRequest_AlreadyVerified(t *testing.T) {
+	mockRepo := &mocks.UserRepo{
+		FindByIDFn: func(int) (*models.User, error) {
+			return &models.User{ID: 1, Verified: true}, nil
+		},
+	}
+	svc := &UserService{repo: mockRepo}
+	_, status, err := svc.CreateVerificationRequest(1, "Ministry", "https://youtube.com/@x", "")
+	require.Error(t, err)
+	assert.Equal(t, 400, status)
+}

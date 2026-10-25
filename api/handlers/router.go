@@ -79,6 +79,9 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Put("/profile/avatar", ra, h.UpdateAvatar)
 	api.Put("/profile/username", ra, h.UpdateUsername)
 
+	api.Post("/verification-requests", ra, h.CreateVerificationRequest)
+	api.Get("/verification-requests/me", ra, h.GetMyVerificationRequest)
+
 	// ── Push notifications ─────────────────────────────────────────────────────
 	api.Post("/notifications/device-token", ra, h.RegisterDeviceToken)
 	api.Delete("/notifications/device-token", ra, h.UnregisterDeviceToken)
@@ -140,10 +143,13 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Get("/admin/song-reports", ra, rm, h.GetSongReports)
 	api.Put("/admin/song-reports/:id", ra, rm, h.UpdateSongReport)
 	api.Get("/admin/fcm-status", ra, rm, h.GetFCMStatus)
+	api.Get("/admin/verification-requests", ra, rm, h.GetVerificationRequests)
+	api.Put("/admin/verification-requests/:id", ra, rm, h.UpdateVerificationRequest)
 
 	admin := api.Group("/admin", ra, h.authMW.RequireAdmin)
 	admin.Get("/users", h.GetUsers)
 	admin.Put("/users/:id/role", h.UpdateUserRole)
+	admin.Put("/users/:id/verified", h.UpdateUserVerified)
 
 	// Analytics (admin read)
 	admin.Get("/analytics/songs", h.GetAnalyticsSongs)

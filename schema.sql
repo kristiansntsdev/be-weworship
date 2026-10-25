@@ -145,9 +145,23 @@ CREATE TABLE IF NOT EXISTS performance_logs (
 );
 
 -- ── Indexes ───────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS verification_requests (
+    id           SERIAL PRIMARY KEY,
+    user_id      INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    display_name VARCHAR(120) NOT NULL,
+    proof_link   TEXT         NOT NULL,
+    note         TEXT,
+    status       VARCHAR(20)  NOT NULL DEFAULT 'pending',
+    admin_notes  TEXT,
+    "createdAt"  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    "updatedAt"  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_email              ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role               ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_detail_user_id     ON users_detail(user_id);
+CREATE INDEX IF NOT EXISTS idx_verification_requests_user_id ON verification_requests (user_id);
+CREATE INDEX IF NOT EXISTS idx_verification_requests_status ON verification_requests (status);
 CREATE INDEX IF NOT EXISTS idx_playlists_user_id        ON playlists(user_id);
 CREATE INDEX IF NOT EXISTS idx_playlists_share_token    ON playlists(share_token);
 CREATE INDEX IF NOT EXISTS idx_playlist_teams_playlist  ON playlist_teams(playlist_id);
