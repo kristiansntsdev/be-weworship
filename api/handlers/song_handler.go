@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"be-songbanks-v1/api/middleware"
+	"be-songbanks-v1/api/services"
 	"be-songbanks-v1/api/utils"
 	"bytes"
+	"errors"
 	"log"
 	"regexp"
 
@@ -487,6 +489,24 @@ func (h *Handler) RequestSong(c *fiber.Ctx) error {
 		return utils.FailErr(c, 500, "Failed to submit song request", err)
 	}
 	return utils.OK(c, 201, "Song request submitted successfully", result)
+}
+
+// CheckSongRequestLink tells the request form whether a reference link holds a chord sheet we can read.
+func (h *Handler) CheckSongRequestLink(c *fiber.Ctx) error {
+	var req struct {
+		URL string `json:"url"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	result, err := h.songLinks.CheckLink(c.UserContext(), req.URL)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidSongLink) {
+			return utils.Fail(c, 400, err.Error())
+		}
+		return utils.FailErr(c, 500, "Failed to check link", err)
+	}
+	return utils.OK(c, 200, "Link checked", result)
 }
 
 func (h *Handler) GetSongRequests(c *fiber.Ctx) error {

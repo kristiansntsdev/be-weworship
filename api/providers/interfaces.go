@@ -14,3 +14,8 @@ type EmbedderIface interface {
 	Model() string
 	Embed(ctx context.Context, inputs []string) ([][]float32, error)
 }
+
+// PageFetcherIface abstracts PageFetcher (outbound fetch of user-supplied links) for testing.
+type PageFetcherIface interface {
+	Fetch(ctx context.Context, rawURL string) (*FetchedPage, error)
+}

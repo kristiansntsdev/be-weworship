@@ -22,10 +22,11 @@ type Handler struct {
 	audit         *services.AuditService
 	notifications *services.NotificationService
 	invitations   *services.InvitationService
+	songLinks     *services.SongLinkService
 }
 
-func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService, notifications *services.NotificationService, invitations *services.InvitationService) *Handler {
-	return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit, notifications: notifications, invitations: invitations}
+func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService, notifications *services.NotificationService, invitations *services.InvitationService, songLinks *services.SongLinkService) *Handler {
+	return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit, notifications: notifications, invitations: invitations, songLinks: songLinks}
 }
 
 func (h *Handler) Register(app *fiber.App) {
@@ -55,6 +56,7 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Delete("/favorites/:songId", ra, h.RemoveFavorite)
 	api.Get("/songs/:id", h.authMW.OptionalAuth, h.GetSongByID)
 	api.Post("/song-requests", ra, h.RequestSong)
+	api.Post("/song-requests/check-link", ra, h.CheckSongRequestLink)
 	api.Get("/song-requests", ra, h.GetMySongRequests)
 	api.Delete("/song-requests/:id", ra, h.DeleteSongRequest)
 	api.Post("/song-reports", ra, h.CreateSongReport)
