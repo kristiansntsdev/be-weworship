@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -51,6 +52,85 @@ func formatVector(v []float32) string {
 	}
 	b.WriteByte(']')
 	return b.String()
+}
+
+// parseVector reads a pgvector text literal ("[0.1,-0.2]") back into a vector — the inverse of formatVector.
+func parseVector(s string) ([]float32, error) {
+	s = strings.TrimSpace(s)
+	if len(s) < 2 || s[0] != '[' || s[len(s)-1] != ']' {
+		return nil, fmt.Errorf("invalid vector literal")
+	}
+	body := s[1 : len(s)-1]
+	if strings.TrimSpace(body) == "" {
+		return []float32{}, nil
+	}
+	parts := strings.Split(body, ",")
+	out := make([]float32, len(parts))
+	for i, p := range parts {
+		f, err := strconv.ParseFloat(strings.TrimSpace(p), 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid vector literal: %w", err)
+		}
+		out[i] = float32(f)
+	}
+	return out, nil
+}
+
+// MixCandidate is a playable song near a taste or mood vector, with what a mix needs to list it.
+type MixCandidate struct {
+	SongID   int            `db:"song_id"`
+	Distance float64        `db:"distance"`
+	Title    string         `db:"title"`
+	Artist   sql.NullString `db:"artist"` // JSON array, see utils.ParseArtists
+	Key      sql.NullString `db:"base_chord"`
+}
+
+// SongVectors returns each song's whole-song embedding (chunk 0). Songs without one are left out.
+func (r *EmbeddingRepository) SongVectors(songIDs []int, model string) (map[int][]float32, error) {
+	out := map[int][]float32{}
+	if len(songIDs) == 0 {
+		return out, nil
+	}
+	ids64 := make([]int64, len(songIDs))
+	for i, id := range songIDs {
+		ids64[i] = int64(id)
+	}
+	rows := []struct {
+		SongID    int    `db:"song_id"`
+		Embedding string `db:"embedding"`
+	}{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+		SELECT song_id, embedding::text AS embedding
+		FROM song_embeddings
+		WHERE model = ? AND chunk_index = 0 AND song_id = ANY(?)`), model, ids64)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		vec, err := parseVector(row.Embedding)
+		if err != nil {
+			return nil, fmt.Errorf("song %d: %w", row.SongID, err)
+		}
+		out[row.SongID] = vec
+	}
+	return out, nil
+}
+
+// NearestPlayableSongs ranks playable songs (ChordPro, not DMCA'd — same rule as SongRepository.ListRecent) by how
+// close their whole-song embedding (chunk 0) is to the vector, nearest first. Unlike NearestSongs it ignores stanza
+// chunks: a mix wants songs that are alike as a whole, not songs sharing one line.
+func (r *EmbeddingRepository) NearestPlayableSongs(vector []float32, model string, limit int) ([]MixCandidate, error) {
+	rows := []MixCandidate{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+		SELECT e.song_id, e.embedding <=> ?::vector AS distance, s.title, s.artist, s.base_chord
+		FROM song_embeddings e
+		JOIN songs s ON s.id = e.song_id
+		WHERE e.model = ? AND e.chunk_index = 0
+		  AND s.lyrics_and_chords LIKE '%[%' AND s.lyrics_and_chords NOT LIKE '%<span%'
+		  AND s.dmca_takedown = false
+		ORDER BY distance ASC
+		LIMIT ?`), formatVector(vector), model, limit)
+	return rows, err
 }
 
 // ReplaceSongChunks swaps all of a song's chunks atomically.

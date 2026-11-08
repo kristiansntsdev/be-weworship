@@ -174,6 +174,59 @@ LIMIT ?`), userID, limit)
 	return ids, err
 }
 
+// TasteSongRow is one kind of interaction a user had with a song, used to build personal mixes.
+// AgeSeconds is measured by the database clock, so no Go/DB time-zone conversion is involved.
+type TasteSongRow struct {
+	SongID     int     `db:"song_id"`
+	Kind       string  `db:"kind"` // favorite | add_to_playlist | view
+	Count      int     `db:"count"`
+	AgeSeconds float64 `db:"age_seconds"` // since the most recent interaction of this kind
+}
+
+// TasteSongSignals returns the user's favorites (any age) plus views and playlist adds from the last `days` days,
+// one row per song and kind.
+func (r *AnalyticsRepository) TasteSongSignals(userID, days int) ([]TasteSongRow, error) {
+	rows := []TasteSongRow{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+SELECT song_id, kind, COUNT(*)::int AS count, EXTRACT(EPOCH FROM (NOW() - MAX(at)))::float8 AS age_seconds
+FROM (
+  SELECT song_id, 'favorite' AS kind, "createdAt" AS at
+  FROM song_favorites
+  WHERE user_id = ?
+  UNION ALL
+  SELECT song_id, event_type AS kind, "createdAt" AS at
+  FROM song_events
+  WHERE user_id = ? AND song_id IS NOT NULL
+    AND event_type IN ('view', 'add_to_playlist')
+    AND "createdAt" >= NOW() - (? * INTERVAL '1 day')
+) s
+GROUP BY song_id, kind`), userID, userID, days)
+	return rows, err
+}
+
+// TasteSearchRow is one distinct search query a user ran, used to build personal mixes.
+type TasteSearchRow struct {
+	Query      string  `db:"query"`
+	Count      int     `db:"count"`
+	AgeSeconds float64 `db:"age_seconds"` // since the most recent run of this query
+}
+
+// TasteSearchSignals returns the user's distinct searches (lower-cased, ≥3 characters) from the last `days` days
+// that found at least one song, most recent first. Searches that found nothing are typos or missing songs.
+func (r *AnalyticsRepository) TasteSearchSignals(userID, days, limit int) ([]TasteSearchRow, error) {
+	rows := []TasteSearchRow{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+SELECT LOWER(TRIM(query)) AS query, COUNT(*)::int AS count,
+       EXTRACT(EPOCH FROM (NOW() - MAX("createdAt")))::float8 AS age_seconds
+FROM search_logs
+WHERE user_id = ? AND results_count > 0 AND LENGTH(TRIM(query)) >= 3
+  AND "createdAt" >= NOW() - (? * INTERVAL '1 day')
+GROUP BY LOWER(TRIM(query))
+ORDER BY age_seconds ASC
+LIMIT ?`), userID, days, limit)
+	return rows, err
+}
+
 type PlatformBreakdownRow struct {
 	Date     string `db:"date" json:"date"`
 	Platform string `db:"platform" json:"platform"`

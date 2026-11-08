@@ -156,6 +156,8 @@ type AnalyticsRepoIface interface {
 	TopSearches(days, limit int) ([]TopSearchRow, error)
 	RecentSearchesByUser(userID, limit int) ([]string, error)
 	RecentViewedSongIDs(userID, limit int) ([]int, error)
+	TasteSongSignals(userID, days int) ([]TasteSongRow, error)
+	TasteSearchSignals(userID, days, limit int) ([]TasteSearchRow, error)
 	SessionsByPlatform(days int) ([]PlatformBreakdownRow, error)
 	PerformanceSummary(days int) ([]PerfSummaryRow, error)
 	TotalUsers() (int, error)
@@ -182,6 +184,15 @@ type EmbeddingRepoIface interface {
 	ReplaceSongChunks(songID int, model, hash string, chunks []SongChunk) error
 	StoredHashes(model string) (map[int]string, error)
 	NearestSongs(vector []float32, model string, maxDistance float64, limit int) ([]SongDistance, error)
+	SongVectors(songIDs []int, model string) (map[int][]float32, error)
+	NearestPlayableSongs(vector []float32, model string, limit int) ([]MixCandidate, error)
 	Source(songID int) (*EmbeddingSource, error)
 	AllSources() ([]EmbeddingSource, error)
+}
+
+// MixRepoIface abstracts MixRepository for testing.
+type MixRepoIface interface {
+	ListForUser(userID int) ([]MixRow, error)
+	ReplacePersonal(userID int, mixes []MixRow) error
+	Upsert(userID int, m MixRow) error
 }

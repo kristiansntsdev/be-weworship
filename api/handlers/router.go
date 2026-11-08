@@ -23,10 +23,11 @@ type Handler struct {
 	notifications *services.NotificationService
 	invitations   *services.InvitationService
 	songLinks     *services.SongLinkService
+	mixes         *services.MixService
 }
 
-func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService, notifications *services.NotificationService, invitations *services.InvitationService, songLinks *services.SongLinkService) *Handler {
-	return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit, notifications: notifications, invitations: invitations, songLinks: songLinks}
+func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService, notifications *services.NotificationService, invitations *services.InvitationService, songLinks *services.SongLinkService, mixes *services.MixService) *Handler {
+	return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit, notifications: notifications, invitations: invitations, songLinks: songLinks, mixes: mixes}
 }
 
 func (h *Handler) Register(app *fiber.App) {
@@ -54,6 +55,8 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Post("/favorites/:songId/toggle", ra, h.ToggleFavorite)
 	api.Post("/favorites/:songId", ra, h.AddFavorite)
 	api.Delete("/favorites/:songId", ra, h.RemoveFavorite)
+	api.Get("/mixes", ra, h.GetMixes)
+	api.Get("/mixes/moods/:mood", ra, h.GetMoodMix)
 	api.Get("/songs/:id", h.authMW.OptionalAuth, h.GetSongByID)
 	api.Post("/song-requests", ra, h.RequestSong)
 	api.Post("/song-requests/check-link", ra, h.CheckSongRequestLink)

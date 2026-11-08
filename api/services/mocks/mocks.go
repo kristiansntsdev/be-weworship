@@ -801,6 +801,8 @@ type AnalyticsRepo struct {
 	TopSearchesFn          func(int, int) ([]repositories.TopSearchRow, error)
 	RecentSearchesByUserFn  func(int, int) ([]string, error)
 	RecentViewedSongIDsFn   func(int, int) ([]int, error)
+	TasteSongSignalsFn      func(int, int) ([]repositories.TasteSongRow, error)
+	TasteSearchSignalsFn    func(int, int, int) ([]repositories.TasteSearchRow, error)
 	SessionsByPlatformFn    func(int) ([]repositories.PlatformBreakdownRow, error)
 	PerformanceSummaryFn   func(int) ([]repositories.PerfSummaryRow, error)
 	TotalUsersFn           func() (int, error)
@@ -869,6 +871,18 @@ func (m *AnalyticsRepo) RecentSearchesByUser(userID, limit int) ([]string, error
 func (m *AnalyticsRepo) RecentViewedSongIDs(userID, limit int) ([]int, error) {
 	if m.RecentViewedSongIDsFn != nil {
 		return m.RecentViewedSongIDsFn(userID, limit)
+	}
+	return nil, nil
+}
+func (m *AnalyticsRepo) TasteSongSignals(userID, days int) ([]repositories.TasteSongRow, error) {
+	if m.TasteSongSignalsFn != nil {
+		return m.TasteSongSignalsFn(userID, days)
+	}
+	return nil, nil
+}
+func (m *AnalyticsRepo) TasteSearchSignals(userID, days, limit int) ([]repositories.TasteSearchRow, error) {
+	if m.TasteSearchSignalsFn != nil {
+		return m.TasteSearchSignalsFn(userID, days, limit)
 	}
 	return nil, nil
 }
@@ -1026,9 +1040,24 @@ func (m *PushProvider) Send(ctx context.Context, tokens []string, title, body st
 type EmbeddingRepo struct {
 	ReplaceSongChunksFn func(int, string, string, []repositories.SongChunk) error
 	StoredHashesFn      func(string) (map[int]string, error)
-	NearestSongsFn      func([]float32, string, float64, int) ([]repositories.SongDistance, error)
-	SourceFn            func(int) (*repositories.EmbeddingSource, error)
-	AllSourcesFn        func() ([]repositories.EmbeddingSource, error)
+	NearestSongsFn         func([]float32, string, float64, int) ([]repositories.SongDistance, error)
+	SongVectorsFn          func([]int, string) (map[int][]float32, error)
+	NearestPlayableSongsFn func([]float32, string, int) ([]repositories.MixCandidate, error)
+	SourceFn               func(int) (*repositories.EmbeddingSource, error)
+	AllSourcesFn           func() ([]repositories.EmbeddingSource, error)
+}
+
+func (m *EmbeddingRepo) SongVectors(songIDs []int, model string) (map[int][]float32, error) {
+	if m.SongVectorsFn != nil {
+		return m.SongVectorsFn(songIDs, model)
+	}
+	return map[int][]float32{}, nil
+}
+func (m *EmbeddingRepo) NearestPlayableSongs(vector []float32, model string, limit int) ([]repositories.MixCandidate, error) {
+	if m.NearestPlayableSongsFn != nil {
+		return m.NearestPlayableSongsFn(vector, model, limit)
+	}
+	return nil, nil
 }
 
 func (m *EmbeddingRepo) ReplaceSongChunks(songID int, model, hash string, chunks []repositories.SongChunk) error {
@@ -1060,6 +1089,33 @@ func (m *EmbeddingRepo) AllSources() ([]repositories.EmbeddingSource, error) {
 		return m.AllSourcesFn()
 	}
 	return nil, nil
+}
+
+// ── MixRepo ───────────────────────────────────────────────────────────────────
+
+type MixRepo struct {
+	ListForUserFn     func(int) ([]repositories.MixRow, error)
+	ReplacePersonalFn func(int, []repositories.MixRow) error
+	UpsertFn          func(int, repositories.MixRow) error
+}
+
+func (m *MixRepo) ListForUser(userID int) ([]repositories.MixRow, error) {
+	if m.ListForUserFn != nil {
+		return m.ListForUserFn(userID)
+	}
+	return nil, nil
+}
+func (m *MixRepo) ReplacePersonal(userID int, mixes []repositories.MixRow) error {
+	if m.ReplacePersonalFn != nil {
+		return m.ReplacePersonalFn(userID, mixes)
+	}
+	return nil
+}
+func (m *MixRepo) Upsert(userID int, mix repositories.MixRow) error {
+	if m.UpsertFn != nil {
+		return m.UpsertFn(userID, mix)
+	}
+	return nil
 }
 
 // ── Embedder ──────────────────────────────────────────────────────────────────

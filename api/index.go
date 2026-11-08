@@ -72,7 +72,8 @@ func buildApp() (*fiber.App, error) {
 		MobileScheme: os.Getenv("MOBILE_SCHEME"),
 	})
 	tagSvc := services.NewTagService(tagRepo)
-	songEmbeddings := services.NewSongEmbeddingService(repositories.NewEmbeddingRepository(ctx.DB), providers.NewEmbedderFromEnv())
+	embeddingRepo := repositories.NewEmbeddingRepository(ctx.DB)
+	songEmbeddings := services.NewSongEmbeddingService(embeddingRepo, providers.NewEmbedderFromEnv())
 	favoriteRepo := repositories.NewFavoriteRepository(ctx.DB)
 	songSvc := services.NewSongService(songRepo, tagRepo, playlistRepo, songCache, songEmbeddings, favoriteRepo)
 	analyticsSvc := services.NewAnalyticsService(analyticsRepo)
@@ -95,7 +96,8 @@ func buildApp() (*fiber.App, error) {
 
 	authMW := middleware.NewAuthMiddleware(authSvc)
 	songLinkSvc := services.NewSongLinkService(providers.NewPageFetcher())
-	h := handlers.NewHandler(authMW, authSvc, songSvc, tagSvc, playlistSvc, teamSvc, userSvc, analyticsSvc, auditSvc, notifSvc, invitationSvc, songLinkSvc)
+	mixSvc := services.NewMixService(analyticsRepo, embeddingRepo, repositories.NewMixRepository(ctx.DB), songEmbeddings)
+	h := handlers.NewHandler(authMW, authSvc, songSvc, tagSvc, playlistSvc, teamSvc, userSvc, analyticsSvc, auditSvc, notifSvc, invitationSvc, songLinkSvc, mixSvc)
 
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	app.Use(cors.New(cors.Config{

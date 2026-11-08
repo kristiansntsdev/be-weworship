@@ -275,6 +275,41 @@ func (s *SongEmbeddingService) Backfill(ctx context.Context, force bool, progres
 	return result, nil
 }
 
+// Model is the embedding model that QueryVectors uses and that song_embeddings rows are stored under.
+func (s *SongEmbeddingService) Model() string { return s.embedder.Model() }
+
+// QueryVectors embeds short texts (search queries, mood prompts) through the query cache, sending every cache miss
+// in one batch. Vectors come back in input order. Shares the cache with SemanticMatches.
+func (s *SongEmbeddingService) QueryVectors(ctx context.Context, texts []string) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	missIdx := []int{}
+	missText := []string{}
+	for i, t := range texts {
+		t = strings.Join(strings.Fields(t), " ")
+		if vec, ok := s.queries.get(t); ok {
+			out[i] = vec
+			continue
+		}
+		missIdx = append(missIdx, i)
+		missText = append(missText, t)
+	}
+	if len(missText) == 0 {
+		return out, nil
+	}
+	vectors, err := s.embedder.Embed(ctx, missText)
+	if err != nil {
+		return nil, err
+	}
+	if len(vectors) != len(missText) {
+		return nil, fmt.Errorf("embedder returned %d vectors for %d inputs", len(vectors), len(missText))
+	}
+	for j, i := range missIdx {
+		out[i] = vectors[j]
+		s.queries.put(missText[j], vectors[j])
+	}
+	return out, nil
+}
+
 // SemanticMatches returns songs whose meaning is close to the query, nearest first.
 func (s *SongEmbeddingService) SemanticMatches(ctx context.Context, query string) ([]repositories.SongDistance, error) {
 	query = strings.Join(strings.Fields(query), " ")
