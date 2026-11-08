@@ -119,7 +119,15 @@ func (r *EmbeddingRepository) SongVectors(songIDs []int, model string) (map[int]
 // NearestPlayableSongs ranks playable songs (ChordPro, not DMCA'd — same rule as SongRepository.ListRecent) by how
 // close their whole-song embedding (chunk 0) is to the vector, nearest first. Unlike NearestSongs it ignores stanza
 // chunks: a mix wants songs that are alike as a whole, not songs sharing one line.
-func (r *EmbeddingRepository) NearestPlayableSongs(vector []float32, model string, limit int) ([]MixCandidate, error) {
+// A non-empty tag (matched case-insensitively by name, e.g. "Calm") keeps only songs carrying that tag.
+func (r *EmbeddingRepository) NearestPlayableSongs(vector []float32, model, tag string, limit int) ([]MixCandidate, error) {
+	tagClause := ""
+	args := []any{formatVector(vector), model}
+	if tag != "" {
+		tagClause = `AND EXISTS (SELECT 1 FROM song_tags st JOIN tags t ON t.id = st.tag_id WHERE st.song_id = s.id AND LOWER(t.name) = LOWER(?))`
+		args = append(args, tag)
+	}
+	args = append(args, limit)
 	rows := []MixCandidate{}
 	err := r.db.Select(&rows, r.db.Rebind(`
 		SELECT e.song_id, e.embedding <=> ?::vector AS distance, s.title, s.artist, s.base_chord
@@ -128,8 +136,9 @@ func (r *EmbeddingRepository) NearestPlayableSongs(vector []float32, model strin
 		WHERE e.model = ? AND e.chunk_index = 0
 		  AND s.lyrics_and_chords LIKE '%[%' AND s.lyrics_and_chords NOT LIKE '%<span%'
 		  AND s.dmca_takedown = false
+		  `+tagClause+`
 		ORDER BY distance ASC
-		LIMIT ?`), formatVector(vector), model, limit)
+		LIMIT ?`), args...)
 	return rows, err
 }
 

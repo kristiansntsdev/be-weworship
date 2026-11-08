@@ -209,3 +209,14 @@ func TestFindMood(t *testing.T) {
 	_, ok = findMood("party")
 	assert.False(t, ok)
 }
+
+func TestFillMix_DropsPlaceholderArtists(t *testing.T) {
+	cands := []repositories.MixCandidate{candidate(1, "-"), candidate(2, "[none]"), candidate(3, "Unknown Artist"), candidate(4, "Regina")}
+	songs, subtitle := fillMix(cands, nil, false)
+
+	assert.Nil(t, songs[0].Artist, `"-" means no artist`)
+	assert.Nil(t, songs[1].Artist)
+	assert.Nil(t, songs[2].Artist)
+	require.NotNil(t, songs[3].Artist)
+	assert.Equal(t, "Regina", subtitle, "placeholders never reach the subtitle")
+}

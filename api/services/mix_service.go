@@ -16,6 +16,9 @@ const (
 	mixFreshFor     = 24 * time.Hour
 	mixEmbedTimeout = 2500 * time.Millisecond
 	moodKeyPrefix   = "mood-"
+	// Mood mixes are stored as mood-v2-<id>: v1 rows were filled with the nearest songs whether or not they had the
+	// mood, and must not be served after the switch to mood tags. Still matches 'mood-%', so ReplacePersonal keeps them.
+	moodStorePrefix = "mood-v2-"
 )
 
 var (
@@ -43,14 +46,36 @@ type MixesResult struct {
 type MixService struct {
 	analytics  repositories.AnalyticsRepoIface
 	embeddings repositories.EmbeddingRepoIface
+	tags       repositories.TagRepoIface // mood chips and mood mixes come from tags named after each mood
 	store      repositories.MixRepoIface
 	vectors    *SongEmbeddingService // nil = no embedder configured, so mixes are disabled
 	now        func() time.Time
 }
 
 // vectors may be nil (no embedder configured): Mixes is then empty and MoodMix unavailable.
-func NewMixService(analytics repositories.AnalyticsRepoIface, embeddings repositories.EmbeddingRepoIface, store repositories.MixRepoIface, vectors *SongEmbeddingService) *MixService {
-	return &MixService{analytics: analytics, embeddings: embeddings, store: store, vectors: vectors, now: time.Now}
+func NewMixService(analytics repositories.AnalyticsRepoIface, embeddings repositories.EmbeddingRepoIface, tags repositories.TagRepoIface, store repositories.MixRepoIface, vectors *SongEmbeddingService) *MixService {
+	return &MixService{analytics: analytics, embeddings: embeddings, tags: tags, store: store, vectors: vectors, now: time.Now}
+}
+
+// availableMoods returns the mood chips worth showing: moods whose tag is on at least moodMinSongs playable songs.
+// A failed count hides every chip rather than offering moods that may turn out empty.
+func (s *MixService) availableMoods() []MixMood {
+	labels := make([]string, len(mixMoods))
+	for i, m := range mixMoods {
+		labels[i] = m.Label
+	}
+	counts, err := s.tags.CountPlayableSongsByTagNames(labels)
+	if err != nil {
+		log.Printf("[mixes] counting mood tags failed: %v", err)
+		return []MixMood{}
+	}
+	out := []MixMood{}
+	for _, m := range mixMoods {
+		if counts[strings.ToLower(m.Label)] >= moodMinSongs {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // Mixes returns the user's personal mixes, rebuilding them when the stored set is missing or older than a day.
@@ -63,7 +88,7 @@ func (s *MixService) Mixes(ctx context.Context, userID int) (MixesResult, error)
 		return MixesResult{}, err
 	}
 	if cached, ok := freshPersonalMixes(rows); ok {
-		return MixesResult{Personalized: true, Mixes: cached, Moods: mixMoods}, nil
+		return MixesResult{Personalized: true, Mixes: cached, Moods: s.availableMoods()}, nil
 	}
 
 	mixes, err := s.buildPersonal(ctx, userID)
@@ -78,11 +103,12 @@ func (s *MixService) Mixes(ctx context.Context, userID int) (MixesResult, error)
 		// The mixes are still right for this response; the next request rebuilds them.
 		log.Printf("[mixes] storing mixes for user %d failed: %v", userID, err)
 	}
-	return MixesResult{Personalized: len(mixes) > 0, Mixes: mixes, Moods: mixMoods}, nil
+	return MixesResult{Personalized: len(mixes) > 0, Mixes: mixes, Moods: s.availableMoods()}, nil
 }
 
-// MoodMix returns the mix for one mood chip: songs near the mood prompt, leaning toward the user's overall taste
-// when there is enough history. Errors are ErrMoodNotFound, ErrMixesUnavailable, or a storage error.
+// MoodMix returns the mix for one mood chip: only songs tagged with that mood, ordered by closeness to the mood
+// prompt blended with the user's overall taste (when there is enough history), so the mix is personal but never
+// pads itself with songs of another mood. Errors are ErrMoodNotFound, ErrMixesUnavailable, or a storage error.
 func (s *MixService) MoodMix(ctx context.Context, userID int, moodID string) (*Mix, error) {
 	mood, ok := findMood(moodID)
 	if !ok {
@@ -91,16 +117,17 @@ func (s *MixService) MoodMix(ctx context.Context, userID int, moodID string) (*M
 	if s.vectors == nil {
 		return nil, ErrMixesUnavailable
 	}
-	key := moodKeyPrefix + mood.ID
+	key, storeKey := moodKeyPrefix+mood.ID, moodStorePrefix+mood.ID
 	rows, err := s.store.ListForUser(userID)
 	if err != nil {
 		return nil, err
 	}
 	for _, r := range rows {
-		if r.Key != key {
+		if r.Key != storeKey {
 			continue
 		}
 		if m, ok := decodeFreshMix(r); ok {
+			m.Key = key
 			return &m, nil
 		}
 	}
@@ -120,14 +147,16 @@ func (s *MixService) MoodMix(ctx context.Context, userID int, moodID string) (*M
 	if len(signals) >= mixMinSignals {
 		taste = weightedCentroid(signals, nil)
 	}
-	candidates, err := s.embeddings.NearestPlayableSongs(blendVectors(moodVecs[0], taste, mixMoodWeight), s.vectors.Model(), mixCandidateLimit)
+	candidates, err := s.embeddings.NearestPlayableSongs(blendVectors(moodVecs[0], taste, mixMoodWeight), s.vectors.Model(), mood.Label, mixCandidateLimit)
 	if err != nil {
 		return nil, err
 	}
 	songs, subtitle := fillMix(candidates, nil, false)
 	mix := Mix{Key: key, Title: mood.Label, Subtitle: subtitle, Songs: songs}
 	if len(songs) > 0 {
-		if err := s.store.Upsert(userID, toMixRow(mix)); err != nil {
+		stored := toMixRow(mix)
+		stored.Key = storeKey
+		if err := s.store.Upsert(userID, stored); err != nil {
 			log.Printf("[mixes] storing mood mix %q for user %d failed: %v", key, userID, err)
 		}
 	}
@@ -151,7 +180,7 @@ func (s *MixService) buildPersonal(ctx context.Context, userID int) ([]Mix, erro
 	lists := [][]repositories.MixCandidate{}
 	used := map[int]bool{}
 	for _, c := range clusterSignals(signals, clusterCount(len(signals)), mixSeed(userID, s.now())) {
-		candidates, err := s.embeddings.NearestPlayableSongs(c.centroid, model, mixCandidateLimit)
+		candidates, err := s.embeddings.NearestPlayableSongs(c.centroid, model, "", mixCandidateLimit)
 		if err != nil {
 			return nil, err
 		}

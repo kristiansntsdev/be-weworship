@@ -107,6 +107,7 @@ type TagRepoIface interface {
 	Create(name string) (int, error)
 	GetTagsForSong(songID int) ([]models.Tag, error)
 	GetTagsForSongs(songIDs []int) (map[int][]models.Tag, error)
+	CountPlayableSongsByTagNames(names []string) (map[string]int, error)
 }
 
 // UserRepoIface abstracts UserRepository for testing.
@@ -185,7 +186,7 @@ type EmbeddingRepoIface interface {
 	StoredHashes(model string) (map[int]string, error)
 	NearestSongs(vector []float32, model string, maxDistance float64, limit int) ([]SongDistance, error)
 	SongVectors(songIDs []int, model string) (map[int][]float32, error)
-	NearestPlayableSongs(vector []float32, model string, limit int) ([]MixCandidate, error)
+	NearestPlayableSongs(vector []float32, model, tag string, limit int) ([]MixCandidate, error)
 	Source(songID int) (*EmbeddingSource, error)
 	AllSources() ([]EmbeddingSource, error)
 }

@@ -526,6 +526,8 @@ type TagRepo struct {
 	CreateFn          func(string) (int, error)
 	GetTagsForSongFn  func(int) ([]models.Tag, error)
 	GetTagsForSongsFn func([]int) (map[int][]models.Tag, error)
+
+	CountPlayableSongsByTagNamesFn func([]string) (map[string]int, error)
 }
 
 func (m *TagRepo) List(search string) ([]models.Tag, error) {
@@ -557,6 +559,12 @@ func (m *TagRepo) GetTagsForSongs(songIDs []int) (map[int][]models.Tag, error) {
 		return m.GetTagsForSongsFn(songIDs)
 	}
 	return nil, nil
+}
+func (m *TagRepo) CountPlayableSongsByTagNames(names []string) (map[string]int, error) {
+	if m.CountPlayableSongsByTagNamesFn != nil {
+		return m.CountPlayableSongsByTagNamesFn(names)
+	}
+	return map[string]int{}, nil
 }
 
 // ── UserRepo ──────────────────────────────────────────────────────────────────
@@ -1042,7 +1050,7 @@ type EmbeddingRepo struct {
 	StoredHashesFn      func(string) (map[int]string, error)
 	NearestSongsFn         func([]float32, string, float64, int) ([]repositories.SongDistance, error)
 	SongVectorsFn          func([]int, string) (map[int][]float32, error)
-	NearestPlayableSongsFn func([]float32, string, int) ([]repositories.MixCandidate, error)
+	NearestPlayableSongsFn func([]float32, string, string, int) ([]repositories.MixCandidate, error)
 	SourceFn               func(int) (*repositories.EmbeddingSource, error)
 	AllSourcesFn           func() ([]repositories.EmbeddingSource, error)
 }
@@ -1053,9 +1061,9 @@ func (m *EmbeddingRepo) SongVectors(songIDs []int, model string) (map[int][]floa
 	}
 	return map[int][]float32{}, nil
 }
-func (m *EmbeddingRepo) NearestPlayableSongs(vector []float32, model string, limit int) ([]repositories.MixCandidate, error) {
+func (m *EmbeddingRepo) NearestPlayableSongs(vector []float32, model, tag string, limit int) ([]repositories.MixCandidate, error) {
 	if m.NearestPlayableSongsFn != nil {
-		return m.NearestPlayableSongsFn(vector, model, limit)
+		return m.NearestPlayableSongsFn(vector, model, tag, limit)
 	}
 	return nil, nil
 }

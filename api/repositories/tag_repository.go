@@ -55,6 +55,39 @@ func (r *TagRepository) GetTagsForSong(songID int) ([]models.Tag, error) {
 	return rows, err
 }
 
+// CountPlayableSongsByTagNames counts playable songs (ChordPro, not DMCA'd) per tag, keyed by lower-cased tag name.
+// Tags with no playable songs are absent.
+func (r *TagRepository) CountPlayableSongsByTagNames(names []string) (map[string]int, error) {
+	out := map[string]int{}
+	if len(names) == 0 {
+		return out, nil
+	}
+	lower := make([]string, len(names))
+	for i, n := range names {
+		lower[i] = strings.ToLower(n)
+	}
+	rows := []struct {
+		Name  string `db:"name"`
+		Count int    `db:"count"`
+	}{}
+	err := r.db.Select(&rows, r.db.Rebind(`
+		SELECT LOWER(t.name) AS name, COUNT(*)::int AS count
+		FROM tags t
+		JOIN song_tags st ON st.tag_id = t.id
+		JOIN songs s ON s.id = st.song_id
+		WHERE LOWER(t.name) = ANY(?)
+		  AND s.lyrics_and_chords LIKE '%[%' AND s.lyrics_and_chords NOT LIKE '%<span%'
+		  AND s.dmca_takedown = false
+		GROUP BY LOWER(t.name)`), lower)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.Name] = row.Count
+	}
+	return out, nil
+}
+
 // GetTagsForSongs loads the tags of several songs in one query, keyed by song id. Songs without tags are absent.
 func (r *TagRepository) GetTagsForSongs(songIDs []int) (map[int][]models.Tag, error) {
 	bySong := map[int][]models.Tag{}

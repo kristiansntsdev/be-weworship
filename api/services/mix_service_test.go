@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,10 +19,12 @@ type mixFixture struct {
 	analytics  *mocks.AnalyticsRepo
 	embeddings *mocks.EmbeddingRepo
 	store      *mocks.MixRepo
+	tags       *mocks.TagRepo
 	embedder   *mocks.Embedder
 	replaced   [][]repositories.MixRow
 	upserted   []repositories.MixRow
 	nearest    int
+	nearestTag []string // the tag filter of every NearestPlayableSongs call
 }
 
 func newMixFixture() *mixFixture {
@@ -50,8 +53,9 @@ func newMixFixture() *mixFixture {
 			}
 			return out, nil
 		},
-		NearestPlayableSongsFn: func([]float32, string, int) ([]repositories.MixCandidate, error) {
+		NearestPlayableSongsFn: func(_ []float32, _ string, tag string, _ int) ([]repositories.MixCandidate, error) {
 			f.nearest++
+			f.nearestTag = append(f.nearestTag, tag)
 			cands := []repositories.MixCandidate{}
 			for id := 1; id <= 40; id++ {
 				cands = append(cands, candidate(id, fmt.Sprintf("Artist %d", id)))
@@ -69,6 +73,15 @@ func newMixFixture() *mixFixture {
 			return nil
 		},
 	}
+	// Every mood has plenty of tagged songs except Christmas, which has 3.
+	f.tags = &mocks.TagRepo{CountPlayableSongsByTagNamesFn: func(names []string) (map[string]int, error) {
+		out := map[string]int{}
+		for _, n := range names {
+			out[strings.ToLower(n)] = 40
+		}
+		out["christmas"] = 3
+		return out, nil
+	}}
 	f.embedder = &mocks.Embedder{ModelName: "bge-m3", EmbedFn: func(_ context.Context, in []string) ([][]float32, error) {
 		out := make([][]float32, len(in))
 		for i := range in {
@@ -80,7 +93,7 @@ func newMixFixture() *mixFixture {
 }
 
 func (f *mixFixture) service() *MixService {
-	svc := NewMixService(f.analytics, f.embeddings, f.store, NewSongEmbeddingService(&mocks.EmbeddingRepo{}, f.embedder))
+	svc := NewMixService(f.analytics, f.embeddings, f.tags, f.store, NewSongEmbeddingService(&mocks.EmbeddingRepo{}, f.embedder))
 	svc.now = func() time.Time { return time.Date(2026, 11, 8, 10, 0, 0, 0, time.UTC) }
 	return svc
 }
@@ -100,7 +113,7 @@ func TestMixService_Mixes_ReturnsFreshStoredMixesWithoutRebuilding(t *testing.T)
 	require.Len(t, res.Mixes, 1)
 	assert.Equal(t, "mix-1", res.Mixes[0].Key)
 	assert.Equal(t, 4, res.Mixes[0].Songs[0].ID)
-	assert.Len(t, res.Moods, len(mixMoods))
+	assert.Len(t, res.Moods, len(mixMoods)-1, "Christmas has too few songs")
 	assert.Zero(t, f.nearest, "no vector search for a fresh set")
 	assert.Empty(t, f.replaced)
 }
@@ -183,7 +196,7 @@ func TestMixService_Mixes_EmbedErrorFallsBackToSongs(t *testing.T) {
 
 func TestMixService_Mixes_DisabledWithoutEmbedder(t *testing.T) {
 	f := newMixFixture()
-	svc := NewMixService(f.analytics, f.embeddings, f.store, nil)
+	svc := NewMixService(f.analytics, f.embeddings, f.tags, f.store, nil)
 	res, err := svc.Mixes(context.Background(), 1)
 
 	require.NoError(t, err)
@@ -192,29 +205,81 @@ func TestMixService_Mixes_DisabledWithoutEmbedder(t *testing.T) {
 	assert.Empty(t, res.Moods)
 }
 
-func TestMixService_MoodMix_BuildsAndStores(t *testing.T) {
+func TestMixService_MoodMix_BuildsFromTheMoodTagAndStores(t *testing.T) {
 	f := newMixFixture()
+	mix, err := f.service().MoodMix(context.Background(), 1, "calm")
+
+	require.NoError(t, err)
+	assert.Equal(t, "mood-calm", mix.Key)
+	assert.Equal(t, "Calm", mix.Title)
+	assert.Len(t, mix.Songs, mixSize)
+	assert.Equal(t, []string{"Calm"}, f.nearestTag, "only songs tagged Calm are candidates")
+	require.Len(t, f.upserted, 1)
+	assert.Equal(t, "mood-v2-calm", f.upserted[0].Key, "stored under the v2 key")
+}
+
+func TestMixService_MoodMix_NeverPadsWithOtherMoods(t *testing.T) {
+	f := newMixFixture()
+	f.embeddings.NearestPlayableSongsFn = func(_ []float32, _ string, tag string, _ int) ([]repositories.MixCandidate, error) {
+		// Only three songs carry the Christmas tag.
+		return []repositories.MixCandidate{candidate(1, "A"), candidate(2, "B"), candidate(3, "C")}, nil
+	}
 	mix, err := f.service().MoodMix(context.Background(), 1, "christmas")
 
 	require.NoError(t, err)
-	assert.Equal(t, "mood-christmas", mix.Key)
-	assert.Equal(t, "Christmas", mix.Title)
-	assert.Len(t, mix.Songs, mixSize)
-	require.Len(t, f.upserted, 1)
-	assert.Equal(t, "mood-christmas", f.upserted[0].Key)
+	assert.Len(t, mix.Songs, 3)
+}
+
+func TestMixService_Mixes_HidesMoodsWithFewSongs(t *testing.T) {
+	f := newMixFixture()
+	res, err := f.service().Mixes(context.Background(), 1)
+	require.NoError(t, err)
+
+	ids := []string{}
+	for _, m := range res.Moods {
+		ids = append(ids, m.ID)
+	}
+	assert.NotContains(t, ids, "christmas")
+	assert.Contains(t, ids, "calm")
+	for _, tag := range f.nearestTag {
+		assert.Empty(t, tag, "personal mixes are not limited to a mood")
+	}
+}
+
+func TestMixService_Mixes_TagCountErrorHidesMoods(t *testing.T) {
+	f := newMixFixture()
+	f.tags.CountPlayableSongsByTagNamesFn = func([]string) (map[string]int, error) { return nil, errors.New("db down") }
+	res, err := f.service().Mixes(context.Background(), 1)
+
+	require.NoError(t, err)
+	assert.Empty(t, res.Moods)
+	assert.NotEmpty(t, res.Mixes)
 }
 
 func TestMixService_MoodMix_UsesFreshStoredMix(t *testing.T) {
 	f := newMixFixture()
 	f.store.ListForUserFn = func(int) ([]repositories.MixRow, error) {
-		return []repositories.MixRow{{Key: "mood-calm", Title: "Calm", SongsJSON: `[{"id":2,"title":"Song 2","artist":null,"key":null}]`, AgeSeconds: 60}}, nil
+		return []repositories.MixRow{{Key: "mood-v2-calm", Title: "Calm", SongsJSON: `[{"id":2,"title":"Song 2","artist":null,"key":null}]`, AgeSeconds: 60}}, nil
 	}
 	mix, err := f.service().MoodMix(context.Background(), 1, "calm")
 
 	require.NoError(t, err)
+	assert.Equal(t, "mood-calm", mix.Key, "the API key stays mood-<id>")
 	require.Len(t, mix.Songs, 1)
 	assert.Equal(t, 2, mix.Songs[0].ID)
 	assert.Zero(t, f.nearest)
+}
+
+func TestMixService_MoodMix_IgnoresV1StoredMix(t *testing.T) {
+	f := newMixFixture()
+	f.store.ListForUserFn = func(int) ([]repositories.MixRow, error) {
+		// Built before mood tags: nearest songs regardless of mood.
+		return []repositories.MixRow{{Key: "mood-calm", Title: "Calm", SongsJSON: `[{"id":2,"title":"Song 2","artist":null,"key":null}]`, AgeSeconds: 60}}, nil
+	}
+	_, err := f.service().MoodMix(context.Background(), 1, "calm")
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, f.nearest, "rebuilt from tags instead of serving the v1 row")
 }
 
 func TestMixService_MoodMix_Errors(t *testing.T) {
@@ -222,7 +287,7 @@ func TestMixService_MoodMix_Errors(t *testing.T) {
 	_, err := f.service().MoodMix(context.Background(), 1, "party")
 	assert.ErrorIs(t, err, ErrMoodNotFound)
 
-	_, err = NewMixService(f.analytics, f.embeddings, f.store, nil).MoodMix(context.Background(), 1, "calm")
+	_, err = NewMixService(f.analytics, f.embeddings, f.tags, f.store, nil).MoodMix(context.Background(), 1, "calm")
 	assert.ErrorIs(t, err, ErrMixesUnavailable)
 
 	f.embedder.EmbedFn = func(context.Context, []string) ([][]float32, error) { return nil, errors.New("ollama down") }

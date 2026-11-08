@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"be-songbanks-v1/api/repositories"
 	"be-songbanks-v1/api/utils"
@@ -34,11 +35,13 @@ const (
 	mixKMeansIterations = 12
 	mixKMeansRestarts   = 8
 	mixMoodWeight       = 0.6
+	moodMinSongs        = 5 // a mood chip is shown only when its tag is on at least this many playable songs
 )
 
 var mixKindWeight = map[string]float64{"favorite": 3, "add_to_playlist": 3, "search": 2, "view": 1}
 
-// MixMood is one mood chip. Prompt is the text that gets embedded; it mixes Indonesian and English because most
+// MixMood is one mood chip. Songs belong to a mood through the tag named Label (e.g. "Calm"), which admins can also
+// set on a song. Prompt is embedded only to order a mood's songs; it mixes Indonesian and English because most
 // lyrics are Indonesian and bge-m3 is multilingual.
 type MixMood struct {
 	ID     string `json:"id"`
@@ -433,10 +436,19 @@ type mixPick struct {
 	artists []string // display names, for the per-artist cap and the subtitle
 }
 
+// isPlaceholderArtist reports catalog fillers that mean "no artist": "-", ".", "[none]", "Unknown Artist".
+func isPlaceholderArtist(name string) bool {
+	switch strings.ToLower(name) {
+	case "", "[none]", "none", "unknown", "unknown artist":
+		return true
+	}
+	return strings.IndexFunc(name, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }) < 0
+}
+
 func toPick(c repositories.MixCandidate) mixPick {
 	names := []string{}
 	for _, a := range utils.ParseArtists(c.Artist.String) {
-		if a = strings.TrimSpace(a); a != "" {
+		if a = strings.TrimSpace(a); !isPlaceholderArtist(a) {
 			names = append(names, a)
 		}
 	}
