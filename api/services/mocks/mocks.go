@@ -301,6 +301,8 @@ type PlaylistRepo struct {
 	SetSongKeyFn               func(int, int, string) error
 	GetSongKeysFn              func(int) (map[int]string, error)
 	DeleteSongKeyFn            func(int, int) error
+	GetOwnerFn                 func(int) (*repositories.PlaylistOwner, error)
+	CopySongKeysFn             func(int, int) error
 }
 
 func (m *PlaylistRepo) RecordShareEvent(playlistID int) {
@@ -433,6 +435,45 @@ func (m *PlaylistRepo) DeleteSongKey(playlistID, songID int) error {
 		return m.DeleteSongKeyFn(playlistID, songID)
 	}
 	return nil
+}
+func (m *PlaylistRepo) GetOwner(userID int) (*repositories.PlaylistOwner, error) {
+	if m.GetOwnerFn != nil {
+		return m.GetOwnerFn(userID)
+	}
+	return nil, nil
+}
+func (m *PlaylistRepo) CopySongKeys(fromID, toID int) error {
+	if m.CopySongKeysFn != nil {
+		return m.CopySongKeysFn(fromID, toID)
+	}
+	return nil
+}
+
+// ── ProfileRepo ───────────────────────────────────────────────────────────────
+
+type ProfileRepo struct {
+	SearchFn          func(string, int) ([]repositories.ProfileRow, error)
+	FindByUsernameFn  func(string) (*repositories.ProfileRow, error)
+	PublicPlaylistsFn func(int) ([]repositories.PublicPlaylistRow, error)
+}
+
+func (m *ProfileRepo) Search(q string, limit int) ([]repositories.ProfileRow, error) {
+	if m.SearchFn != nil {
+		return m.SearchFn(q, limit)
+	}
+	return nil, nil
+}
+func (m *ProfileRepo) FindByUsername(username string) (*repositories.ProfileRow, error) {
+	if m.FindByUsernameFn != nil {
+		return m.FindByUsernameFn(username)
+	}
+	return nil, nil
+}
+func (m *ProfileRepo) PublicPlaylists(userID int) ([]repositories.PublicPlaylistRow, error) {
+	if m.PublicPlaylistsFn != nil {
+		return m.PublicPlaylistsFn(userID)
+	}
+	return nil, nil
 }
 
 // ── TeamRepo ──────────────────────────────────────────────────────────────────

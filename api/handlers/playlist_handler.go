@@ -101,6 +101,20 @@ func (h *Handler) UpdatePlaylistVisibility(c *fiber.Ctx) error {
 	return utils.OK(c, 200, "Playlist visibility updated", fiber.Map{"id": id, "is_public": *req.IsPublic})
 }
 
+// CopyPlaylist saves a private copy of a playlist the caller can read, e.g. someone's public playlist.
+func (h *Handler) CopyPlaylist(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	data, status, err := h.playlists.Copy(id, cl.UserID)
+	if err != nil {
+		return utils.FailErr(c, status, err.Error(), err)
+	}
+	return utils.OK(c, 201, "Playlist copied", data)
+}
+
 func (h *Handler) DeletePlaylist(c *fiber.Ctx) error {
 	cl := middleware.GetClaims(c)
 	id, err := parseID(c, "id")

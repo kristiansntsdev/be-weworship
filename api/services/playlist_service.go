@@ -8,6 +8,7 @@ import (
 	"be-songbanks-v1/api/utils"
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -113,7 +114,11 @@ func (s *PlaylistService) GetByIDWithAccess(playlistID, userID int) (map[string]
 		songKeysOut[fmt.Sprintf("%d", id)] = chord
 	}
 	resp := map[string]any{"id": pl.ID, "playlist_name": pl.PlaylistName, "user_id": pl.UserID, "songs": songIDs, "song_keys": songKeysOut, "playlist_notes": utils.ParseAnyJSON(pl.PlaylistNotesRaw.String), "is_public": pl.IsPublic, "createdAt": pl.CreatedAt, "updatedAt": pl.UpdatedAt, "access_type": access}
-	if pl.IsShared {
+	if owner, err := s.playlists.GetOwner(pl.UserID); err == nil && owner != nil {
+		resp["owner"] = map[string]any{"username": owner.Username, "display_name": owner.DisplayName, "verified": owner.Verified}
+	}
+	// A viewer reads a public playlist without being on its team: the share token would let them join the team.
+	if pl.IsShared && access != "viewer" {
 		resp["sharable_link"] = utils.NullableString(pl.ShareableURL)
 		resp["share_token"] = utils.NullableString(pl.ShareToken)
 		resp["playlist_team_id"] = pl.PlaylistTeamID.Int64
@@ -399,6 +404,9 @@ func (s *PlaylistService) recordPlaylistAdds(userID int, songIDs []int) {
 	}
 }
 
+// loadWithAccess returns the playlist and the caller's access: owner, leader, co-lead or member of its team, or
+// "viewer" for anyone else when the playlist is public. Viewers may only read: every write path checks team
+// membership itself (CanManage, canUseMdTools, ...).
 func (s *PlaylistService) loadWithAccess(playlistID, userID int) (*models.Playlist, string, error) {
 	pl, err := s.playlists.GetByID(playlistID)
 	if err != nil || pl == nil {
@@ -407,20 +415,71 @@ func (s *PlaylistService) loadWithAccess(playlistID, userID int) (*models.Playli
 	if pl.UserID == userID {
 		return pl, "owner", nil
 	}
-	team, err := s.teams.FindByPlaylistID(playlistID)
-	if err != nil || team == nil {
-		return nil, "", sql.ErrNoRows
+	if team, err := s.teams.FindByPlaylistID(playlistID); err == nil && team != nil {
+		if team.LeadID == userID {
+			return pl, "leader", nil
+		}
+		if utils.ContainsInt(utils.ParseIntSlice(team.CoLeadsRaw.String), userID) {
+			return pl, "co-lead", nil
+		}
+		if utils.ContainsInt(utils.ParseIntSlice(team.MembersRaw.String), userID) {
+			return pl, "member", nil
+		}
 	}
-	if team.LeadID == userID {
-		return pl, "leader", nil
-	}
-	if utils.ContainsInt(utils.ParseIntSlice(team.CoLeadsRaw.String), userID) {
-		return pl, "co-lead", nil
-	}
-	if utils.ContainsInt(utils.ParseIntSlice(team.MembersRaw.String), userID) {
-		return pl, "member", nil
+	if pl.IsPublic {
+		return pl, "viewer", nil
 	}
 	return nil, "", sql.ErrNoRows
+}
+
+// Copy saves a private copy of a playlist the user can read (their own, one they joined, or a public one) with
+// the same songs and per-song keys. The copy is named "<name> (copy)", numbered when that name is taken.
+func (s *PlaylistService) Copy(playlistID, userID int) (map[string]any, int, error) {
+	pl, _, err := s.loadWithAccess(playlistID, userID)
+	if err == sql.ErrNoRows {
+		return nil, 404, fmt.Errorf("playlist not found or access denied")
+	}
+	if err != nil {
+		return nil, 500, err
+	}
+	name, err := s.copyName(userID, pl.PlaylistName)
+	if err != nil {
+		return nil, 500, err
+	}
+	songs := utils.ParseIntSlice(pl.SongsRaw.String)
+	id, err := s.playlists.Create(userID, name, songs, false)
+	if err != nil {
+		return nil, 500, err
+	}
+	if err := s.playlists.CopySongKeys(playlistID, id); err != nil {
+		// The copy is usable without them: songs then open in their own key.
+		log.Printf("[playlists] copying song keys %d -> %d failed: %v", playlistID, id, err)
+	}
+	s.recordPlaylistAdds(userID, songs)
+	return map[string]any{"id": id, "playlist_name": name, "is_public": false}, 201, nil
+}
+
+// copyName picks "<name> (copy)", then "<name> (copy) 2", 3, ... until the user has no playlist by that name.
+func (s *PlaylistService) copyName(userID int, original string) (string, error) {
+	base := []rune(strings.TrimSpace(original))
+	if len(base) > 230 { // playlist_name is VARCHAR(255); leave room for the suffix
+		base = base[:230]
+	}
+	stem := string(base) + " (copy)"
+	for n := 1; n <= 50; n++ {
+		name := stem
+		if n > 1 {
+			name = fmt.Sprintf("%s %d", stem, n)
+		}
+		exists, err := s.playlists.NameExistsForUser(userID, name)
+		if err != nil {
+			return "", err
+		}
+		if !exists {
+			return name, nil
+		}
+	}
+	return fmt.Sprintf("%s %d", stem, time.Now().Unix()), nil
 }
 
 // ── Live Session ──────────────────────────────────────────────────────────────

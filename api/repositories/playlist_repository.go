@@ -255,6 +255,39 @@ func (r *PlaylistRepository) GetSongKeys(playlistID int) (map[int]string, error)
 	return result, rows.Err()
 }
 
+// PlaylistOwner is the public identity of a playlist's owner (no email).
+type PlaylistOwner struct {
+	Username    string `db:"username"`
+	DisplayName string `db:"display_name"`
+	Verified    bool   `db:"verified"`
+}
+
+// GetOwner returns the public identity of a user, for showing who owns a playlist. Nil when the user is gone.
+func (r *PlaylistRepository) GetOwner(userID int) (*PlaylistOwner, error) {
+	var o PlaylistOwner
+	err := r.db.Get(&o, r.db.Rebind(`
+		SELECT u.username, COALESCE(NULLIF(TRIM(ud.full_name), ''), u.username) AS display_name, u.verified
+		FROM users u
+		LEFT JOIN users_detail ud ON ud.user_id = u.id
+		WHERE u.id = ?`), userID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &o, nil
+}
+
+// CopySongKeys gives the target playlist the same per-song keys as the source.
+func (r *PlaylistRepository) CopySongKeys(fromID, toID int) error {
+	_, err := r.db.Exec(r.db.Rebind(`
+		INSERT INTO playlist_song_keys (playlist_id, song_id, base_chord)
+		SELECT ?, song_id, base_chord FROM playlist_song_keys WHERE playlist_id = ?
+		ON CONFLICT (playlist_id, song_id) DO UPDATE SET base_chord = EXCLUDED.base_chord`), toID, fromID)
+	return err
+}
+
 func (r *PlaylistRepository) DeleteSongKey(playlistID, songID int) error {
 	_, err := r.db.Exec(r.db.Rebind(`DELETE FROM playlist_song_keys WHERE playlist_id = ? AND song_id = ?`), playlistID, songID)
 	return err

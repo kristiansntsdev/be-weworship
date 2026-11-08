@@ -83,6 +83,15 @@ type PlaylistRepoIface interface {
 	SetSongKey(playlistID, songID int, baseChord string) error
 	GetSongKeys(playlistID int) (map[int]string, error)
 	DeleteSongKey(playlistID, songID int) error
+	GetOwner(userID int) (*PlaylistOwner, error)
+	CopySongKeys(fromID, toID int) error
+}
+
+// ProfileRepoIface abstracts ProfileRepository for testing.
+type ProfileRepoIface interface {
+	Search(q string, limit int) ([]ProfileRow, error)
+	FindByUsername(username string) (*ProfileRow, error)
+	PublicPlaylists(userID int) ([]PublicPlaylistRow, error)
 }
 
 // TeamRepoIface abstracts TeamRepository for testing.

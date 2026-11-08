@@ -24,10 +24,11 @@ type Handler struct {
 	invitations   *services.InvitationService
 	songLinks     *services.SongLinkService
 	mixes         *services.MixService
+	profiles      *services.ProfileService
 }
 
-func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService, notifications *services.NotificationService, invitations *services.InvitationService, songLinks *services.SongLinkService, mixes *services.MixService) *Handler {
-	return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit, notifications: notifications, invitations: invitations, songLinks: songLinks, mixes: mixes}
+func NewHandler(authMW *middleware.AuthMiddleware, auth *services.AuthService, songs *services.SongService, tags *services.TagService, playlists *services.PlaylistService, teams *services.TeamService, users *services.UserService, analytics *services.AnalyticsService, audit *services.AuditService, notifications *services.NotificationService, invitations *services.InvitationService, songLinks *services.SongLinkService, mixes *services.MixService, profiles *services.ProfileService) *Handler {
+	return &Handler{authMW: authMW, auth: auth, songs: songs, tags: tags, playlists: playlists, teams: teams, users: users, analytics: analytics, audit: audit, notifications: notifications, invitations: invitations, songLinks: songLinks, mixes: mixes, profiles: profiles}
 }
 
 func (h *Handler) Register(app *fiber.App) {
@@ -97,6 +98,9 @@ func (h *Handler) Register(app *fiber.App) {
 
 	// ── User search (for invite-by-username) ──────────────────────────────────
 	api.Get("/users/search", ra, h.SearchUsers)
+	// ── People: public profiles (username, display name, avatar, public playlists — never email) ──
+	api.Get("/profiles", ra, h.SearchProfiles)
+	api.Get("/profiles/:username", ra, h.GetProfile)
 
 	// ── Playlist invitations ──────────────────────────────────────────────────
 	api.Post("/playlists/:id/invitations", ra, h.SendInvitation)
@@ -108,6 +112,7 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Get("/playlists/:id", ra, h.GetPlaylistByID)
 	api.Put("/playlists/:id", ra, h.UpdatePlaylist)
 	api.Put("/playlists/:id/visibility", ra, h.UpdatePlaylistVisibility)
+	api.Post("/playlists/:id/copy", ra, h.CopyPlaylist)
 	api.Delete("/playlists/:id", ra, h.DeletePlaylist)
 	api.Post("/playlists/:id/sharelink", ra, h.GenerateSharelink)
 	api.Get("/playlists/preview/:shareToken", h.GetPlaylistPreview)
