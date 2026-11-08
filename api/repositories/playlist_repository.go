@@ -61,11 +61,28 @@ func (r *PlaylistRepository) NameExistsForUser(userID int, name string) (bool, e
 	return count > 0, nil
 }
 
-func (r *PlaylistRepository) Create(userID int, name string, songs []int) (int, error) {
+func (r *PlaylistRepository) Create(userID int, name string, songs []int, isPublic bool) (int, error) {
 	songsJSON, _ := json.Marshal(songs)
 	var id int
-	err := r.db.QueryRow(r.db.Rebind(`INSERT INTO playlists (playlist_name,user_id,songs,is_shared,is_locked,"createdAt","updatedAt") VALUES (?,?,?,0,0,NOW(),NOW()) RETURNING id`), name, userID, string(songsJSON)).Scan(&id)
+	err := r.db.QueryRow(r.db.Rebind(`INSERT INTO playlists (playlist_name,user_id,songs,is_shared,is_locked,is_public,"createdAt","updatedAt") VALUES (?,?,?,0,0,?,NOW(),NOW()) RETURNING id`), name, userID, string(songsJSON), boolToSmallint(isPublic)).Scan(&id)
 	return id, err
+}
+
+// UpdateVisibility is owner-only: the user_id filter makes it a no-op (0 rows) for anyone else.
+func (r *PlaylistRepository) UpdateVisibility(playlistID, userID int, isPublic bool) (int64, error) {
+	res, err := r.db.Exec(r.db.Rebind(`UPDATE playlists SET is_public=?,"updatedAt"=NOW() WHERE id=? AND user_id=?`), boolToSmallint(isPublic), playlistID, userID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// is_public is SMALLINT (like is_shared/is_locked), so send 0/1 rather than a Go bool.
+func boolToSmallint(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func (r *PlaylistRepository) CountAccessible(userID int) (int, error) {
@@ -80,7 +97,7 @@ func (r *PlaylistRepository) CountAccessible(userID int) (int, error) {
 
 func (r *PlaylistRepository) ListAccessible(userID, page, limit int) ([]models.PlaylistListRow, error) {
 	offset := (page - 1) * limit
-	query := r.db.Rebind(`SELECT DISTINCT p.id,p.playlist_name,p.user_id,p.songs,p.playlist_notes,p."createdAt",p."updatedAt",
+	query := r.db.Rebind(`SELECT DISTINCT p.id,p.playlist_name,p.user_id,p.songs,p.playlist_notes,p.is_public,p."createdAt",p."updatedAt",
 	CASE WHEN p.user_id = ? THEN 'owner' WHEN pt.lead_id = ? THEN 'leader' ELSE 'member' END AS access_type
 	FROM playlists p
 	LEFT JOIN playlist_teams pt ON p.id = pt.playlist_id
@@ -93,7 +110,7 @@ func (r *PlaylistRepository) ListAccessible(userID, page, limit int) ([]models.P
 
 func (r *PlaylistRepository) GetByID(playlistID int) (*models.Playlist, error) {
 	var pl models.Playlist
-	err := r.db.Get(&pl, r.db.Rebind(`SELECT id,playlist_name,sharable_link,share_token,user_id,playlist_team_id,is_shared,is_locked,"createdAt","updatedAt",songs,playlist_notes FROM playlists WHERE id=?`), playlistID)
+	err := r.db.Get(&pl, r.db.Rebind(`SELECT id,playlist_name,sharable_link,share_token,user_id,playlist_team_id,is_shared,is_locked,is_public,"createdAt","updatedAt",songs,playlist_notes FROM playlists WHERE id=?`), playlistID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

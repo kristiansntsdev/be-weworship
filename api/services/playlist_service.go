@@ -39,7 +39,8 @@ func NewPlaylistService(p *repositories.PlaylistRepository, t *repositories.Team
 	}
 }
 
-func (s *PlaylistService) Create(userID int, name string, songs []int) (map[string]any, int, error) {
+// Create stores a new playlist. Callers that omit visibility get isPublic=false — playlists are private by default.
+func (s *PlaylistService) Create(userID int, name string, songs []int, isPublic bool) (map[string]any, int, error) {
 	if strings.TrimSpace(name) == "" {
 		return nil, 400, fmt.Errorf("playlist_name is required")
 	}
@@ -50,12 +51,24 @@ func (s *PlaylistService) Create(userID int, name string, songs []int) (map[stri
 	if exists {
 		return nil, 409, fmt.Errorf("a playlist with this name already exists")
 	}
-	id, err := s.playlists.Create(userID, name, songs)
+	id, err := s.playlists.Create(userID, name, songs, isPublic)
 	if err != nil {
 		return nil, 500, err
 	}
 	s.recordPlaylistAdds(userID, songs)
-	return map[string]any{"id": id, "playlist_name": name, "user_id": userID, "songs": songs}, 201, nil
+	return map[string]any{"id": id, "playlist_name": name, "user_id": userID, "songs": songs, "is_public": isPublic}, 201, nil
+}
+
+// UpdateVisibility switches a playlist between private and public. Only the owner may change it.
+func (s *PlaylistService) UpdateVisibility(playlistID, userID int, isPublic bool) (int, error) {
+	affected, err := s.playlists.UpdateVisibility(playlistID, userID, isPublic)
+	if err != nil {
+		return 500, err
+	}
+	if affected == 0 {
+		return 404, fmt.Errorf("playlist not found")
+	}
+	return 200, nil
 }
 
 func (s *PlaylistService) List(userID, page, limit int) ([]map[string]any, map[string]any, error) {
@@ -75,6 +88,7 @@ func (s *PlaylistService) List(userID, page, limit int) ([]map[string]any, map[s
 			"user_id":        r.UserID,
 			"songs":          utils.ParseIntSlice(r.SongsRaw.String),
 			"playlist_notes": utils.ParseAnyJSON(r.NotesRaw.String),
+			"is_public":      r.IsPublic,
 			"createdAt":      utils.NullableTime(r.CreatedAt),
 			"updatedAt":      utils.NullableTime(r.UpdatedAt),
 			"access_type":    r.AccessType,
@@ -98,7 +112,7 @@ func (s *PlaylistService) GetByIDWithAccess(playlistID, userID int) (map[string]
 	for id, chord := range songKeys {
 		songKeysOut[fmt.Sprintf("%d", id)] = chord
 	}
-	resp := map[string]any{"id": pl.ID, "playlist_name": pl.PlaylistName, "user_id": pl.UserID, "songs": songIDs, "song_keys": songKeysOut, "playlist_notes": utils.ParseAnyJSON(pl.PlaylistNotesRaw.String), "createdAt": pl.CreatedAt, "updatedAt": pl.UpdatedAt, "access_type": access}
+	resp := map[string]any{"id": pl.ID, "playlist_name": pl.PlaylistName, "user_id": pl.UserID, "songs": songIDs, "song_keys": songKeysOut, "playlist_notes": utils.ParseAnyJSON(pl.PlaylistNotesRaw.String), "is_public": pl.IsPublic, "createdAt": pl.CreatedAt, "updatedAt": pl.UpdatedAt, "access_type": access}
 	if pl.IsShared {
 		resp["sharable_link"] = utils.NullableString(pl.ShareableURL)
 		resp["share_token"] = utils.NullableString(pl.ShareToken)

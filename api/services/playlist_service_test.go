@@ -13,22 +13,47 @@ import (
 // ── Create ────────────────────────────────────────────────────────────────────
 
 func TestPlaylistService_Create_Success(t *testing.T) {
+	var storedPublic *bool
 	mockPlaylists := &mocks.PlaylistRepo{
 		NameExistsForUserFn: func(int, string) (bool, error) { return false, nil },
-		CreateFn:            func(int, string, []int) (int, error) { return 10, nil },
+		CreateFn: func(_ int, _ string, _ []int, isPublic bool) (int, error) {
+			storedPublic = &isPublic
+			return 10, nil
+		},
 	}
 	svc := &PlaylistService{playlists: mockPlaylists, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
-	data, status, err := svc.Create(1, "Sunday Set", []int{1, 2})
+	data, status, err := svc.Create(1, "Sunday Set", []int{1, 2}, false)
 
 	require.NoError(t, err)
 	assert.Equal(t, 201, status)
 	assert.Equal(t, 10, data["id"])
 	assert.Equal(t, "Sunday Set", data["playlist_name"])
+	require.NotNil(t, storedPublic)
+	assert.False(t, *storedPublic, "playlists are private unless asked otherwise")
+	assert.Equal(t, false, data["is_public"])
+}
+
+func TestPlaylistService_Create_Public(t *testing.T) {
+	var storedPublic bool
+	mockPlaylists := &mocks.PlaylistRepo{
+		NameExistsForUserFn: func(int, string) (bool, error) { return false, nil },
+		CreateFn: func(_ int, _ string, _ []int, isPublic bool) (int, error) {
+			storedPublic = isPublic
+			return 11, nil
+		},
+	}
+	svc := &PlaylistService{playlists: mockPlaylists, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
+	data, status, err := svc.Create(1, "Open Set", nil, true)
+
+	require.NoError(t, err)
+	assert.Equal(t, 201, status)
+	assert.True(t, storedPublic)
+	assert.Equal(t, true, data["is_public"])
 }
 
 func TestPlaylistService_Create_EmptyName(t *testing.T) {
 	svc := &PlaylistService{playlists: &mocks.PlaylistRepo{}, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
-	_, status, err := svc.Create(1, "   ", nil)
+	_, status, err := svc.Create(1, "   ", nil, false)
 
 	assert.Error(t, err)
 	assert.Equal(t, 400, status)
@@ -39,7 +64,7 @@ func TestPlaylistService_Create_DuplicateName(t *testing.T) {
 		NameExistsForUserFn: func(int, string) (bool, error) { return true, nil },
 	}
 	svc := &PlaylistService{playlists: mockPlaylists, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
-	_, status, err := svc.Create(1, "Sunday Set", nil)
+	_, status, err := svc.Create(1, "Sunday Set", nil, false)
 
 	assert.Error(t, err)
 	assert.Equal(t, 409, status)
@@ -128,6 +153,39 @@ func TestPlaylistService_Delete_NotFound(t *testing.T) {
 	}
 	svc := &PlaylistService{playlists: mockPlaylists, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
 	status, err := svc.Delete(99, 1)
+
+	assert.Error(t, err)
+	assert.Equal(t, 404, status)
+}
+
+// ── UpdateVisibility ──────────────────────────────────────────────────────────
+
+func TestPlaylistService_UpdateVisibility_Owner(t *testing.T) {
+	var gotID, gotUser int
+	var gotPublic bool
+	mockPlaylists := &mocks.PlaylistRepo{
+		UpdateVisibilityFn: func(id, userID int, isPublic bool) (int64, error) {
+			gotID, gotUser, gotPublic = id, userID, isPublic
+			return 1, nil
+		},
+	}
+	svc := &PlaylistService{playlists: mockPlaylists, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
+	status, err := svc.UpdateVisibility(5, 42, true)
+
+	require.NoError(t, err)
+	assert.Equal(t, 200, status)
+	assert.Equal(t, 5, gotID)
+	assert.Equal(t, 42, gotUser)
+	assert.True(t, gotPublic)
+}
+
+func TestPlaylistService_UpdateVisibility_NotOwnerOrMissing(t *testing.T) {
+	// The repo scopes the UPDATE to the owner, so a non-owner (or a missing playlist) affects 0 rows.
+	mockPlaylists := &mocks.PlaylistRepo{
+		UpdateVisibilityFn: func(int, int, bool) (int64, error) { return 0, nil },
+	}
+	svc := &PlaylistService{playlists: mockPlaylists, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
+	status, err := svc.UpdateVisibility(5, 99, true)
 
 	assert.Error(t, err)
 	assert.Equal(t, 404, status)

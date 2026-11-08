@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS playlists (
     playlist_team_id INTEGER,
     is_shared        SMALLINT      NOT NULL DEFAULT 0,
     is_locked        SMALLINT      NOT NULL DEFAULT 0,
+    is_public        SMALLINT      NOT NULL DEFAULT 0,
     "createdAt"      TIMESTAMP     NOT NULL DEFAULT NOW(),
     "updatedAt"      TIMESTAMP     NOT NULL DEFAULT NOW()
 );

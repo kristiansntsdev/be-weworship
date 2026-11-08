@@ -11,11 +11,12 @@ func (h *Handler) CreatePlaylist(c *fiber.Ctx) error {
 	var req struct {
 		PlaylistName string `json:"playlist_name"`
 		Songs        []int  `json:"songs"`
+		IsPublic     bool   `json:"is_public"` // omitted → false: new playlists are private
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return utils.Fail(c, 400, "Invalid JSON")
 	}
-	data, status, err := h.playlists.Create(cl.UserID, req.PlaylistName, req.Songs)
+	data, status, err := h.playlists.Create(cl.UserID, req.PlaylistName, req.Songs, req.IsPublic)
 	if err != nil {
 		return utils.FailErr(c, status, err.Error(), err)
 	}
@@ -76,6 +77,28 @@ func (h *Handler) UpdatePlaylist(c *fiber.Ctx) error {
 		h.notifications.NotifyPlaylistRenamed(oldName, req.PlaylistName, others)
 	}
 	return utils.OK(c, 200, "Playlist updated successfully", fiber.Map{"id": id, "playlist_name": req.PlaylistName})
+}
+
+func (h *Handler) UpdatePlaylistVisibility(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	var req struct {
+		IsPublic *bool `json:"is_public"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	if req.IsPublic == nil {
+		return utils.Fail(c, 400, "is_public is required")
+	}
+	status, err := h.playlists.UpdateVisibility(id, cl.UserID, *req.IsPublic)
+	if err != nil {
+		return utils.FailErr(c, status, err.Error(), err)
+	}
+	return utils.OK(c, 200, "Playlist visibility updated", fiber.Map{"id": id, "is_public": *req.IsPublic})
 }
 
 func (h *Handler) DeletePlaylist(c *fiber.Ctx) error {

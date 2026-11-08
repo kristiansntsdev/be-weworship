@@ -14,6 +14,7 @@ type Playlist struct {
 	PlaylistTeamID   sql.NullInt64  `db:"playlist_team_id"`
 	IsShared         bool           `db:"is_shared"`
 	IsLocked         bool           `db:"is_locked"`
+	IsPublic         bool           `db:"is_public"`
 	CreatedAt        time.Time      `db:"createdAt"`
 	UpdatedAt        time.Time      `db:"updatedAt"`
 	SongsRaw         sql.NullString `db:"songs"`
@@ -26,6 +27,7 @@ type PlaylistListRow struct {
 	UserID       int            `db:"user_id"`
 	SongsRaw     sql.NullString `db:"songs"`
 	NotesRaw     sql.NullString `db:"playlist_notes"`
+	IsPublic     bool           `db:"is_public"`
 	CreatedAt    sql.NullTime   `db:"createdAt"`
 	UpdatedAt    sql.NullTime   `db:"updatedAt"`
 	AccessType   string         `db:"access_type"`

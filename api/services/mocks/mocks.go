@@ -283,7 +283,8 @@ type PlaylistRepo struct {
 	CountShareEventsThisWeekFn func() (int, error)
 	CountShareableFn           func() (int, error)
 	NameExistsForUserFn        func(int, string) (bool, error)
-	CreateFn                   func(int, string, []int) (int, error)
+	CreateFn                   func(int, string, []int, bool) (int, error)
+	UpdateVisibilityFn         func(int, int, bool) (int64, error)
 	CountAccessibleFn          func(int) (int, error)
 	ListAccessibleFn           func(int, int, int) ([]models.PlaylistListRow, error)
 	GetByIDFn                  func(int) (*models.Playlist, error)
@@ -325,9 +326,15 @@ func (m *PlaylistRepo) NameExistsForUser(userID int, name string) (bool, error) 
 	}
 	return false, nil
 }
-func (m *PlaylistRepo) Create(userID int, name string, songs []int) (int, error) {
+func (m *PlaylistRepo) Create(userID int, name string, songs []int, isPublic bool) (int, error) {
 	if m.CreateFn != nil {
-		return m.CreateFn(userID, name, songs)
+		return m.CreateFn(userID, name, songs, isPublic)
+	}
+	return 0, nil
+}
+func (m *PlaylistRepo) UpdateVisibility(playlistID, userID int, isPublic bool) (int64, error) {
+	if m.UpdateVisibilityFn != nil {
+		return m.UpdateVisibilityFn(playlistID, userID, isPublic)
 	}
 	return 0, nil
 }
