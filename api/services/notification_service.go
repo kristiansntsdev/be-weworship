@@ -3,22 +3,77 @@ package services
 import (
 	"context"
 	"fmt"
+	"html"
 	"log"
+	"strings"
 	"time"
 
+	"be-songbanks-v1/api/models"
 	"be-songbanks-v1/api/providers"
 	"be-songbanks-v1/api/repositories"
 )
 
-// NotificationService orchestrates push notifications via the Expo Push API.
+// NotificationService orchestrates push notifications via the Expo Push API,
+// plus admin alerts to Telegram.
 // Sends are synchronous so they complete before the Vercel handler returns.
 type NotificationService struct {
-	push providers.PushProviderIface
-	repo repositories.NotificationRepoIface
+	push      providers.PushProviderIface
+	repo      repositories.NotificationRepoIface
+	telegram  providers.TelegramIface // nil = Telegram alerts disabled
+	clientURL string                  // web app base URL, for admin dashboard links
 }
 
-func NewNotificationService(push *providers.ExpoPushProvider, repo *repositories.NotificationRepository) *NotificationService {
-	return &NotificationService{push: push, repo: repo}
+// telegram may be nil (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID unset): admin alerts are then skipped.
+func NewNotificationService(push *providers.ExpoPushProvider, repo *repositories.NotificationRepository, telegram providers.TelegramIface, clientURL string) *NotificationService {
+	return &NotificationService{push: push, repo: repo, telegram: telegram, clientURL: strings.TrimRight(clientURL, "/")}
+}
+
+const (
+	telegramTimeout       = 5 * time.Second
+	telegramLyricsPreview = 300 // runes of lyrics shown in a song request alert
+)
+
+// NotifySongRequest alerts the admin Telegram chat that a user submitted a song request.
+// Failures are logged only: the request is already saved and must not fail because of the alert.
+func (s *NotificationService) NotifySongRequest(req *models.SongRequest, requester string) {
+	if s.telegram == nil || req == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), telegramTimeout)
+	defer cancel()
+	if err := s.telegram.SendMessage(ctx, buildSongRequestAlert(req, requester, s.clientURL)); err != nil {
+		log.Printf("[notification] NotifySongRequest: Telegram send failed for request %d: %v", req.ID, err)
+	}
+}
+
+func buildSongRequestAlert(req *models.SongRequest, requester, clientURL string) string {
+	esc := html.EscapeString
+	var b strings.Builder
+	b.WriteString("🎵 <b>New song request</b>\n\n")
+	fmt.Fprintf(&b, "<b>Title:</b> %s\n", esc(req.SongTitle))
+	if requester = strings.TrimSpace(requester); requester == "" {
+		requester = "unknown"
+	}
+	fmt.Fprintf(&b, "<b>From:</b> %s (user #%d)\n", esc(requester), req.UserID)
+	lyricsType := "Lyrics"
+	if req.LyricsType == "lyrics_chords" {
+		lyricsType = "Lyrics + chords"
+	}
+	fmt.Fprintf(&b, "<b>Type:</b> %s\n", lyricsType)
+	if req.ReferenceLink != "" {
+		fmt.Fprintf(&b, "<b>Link:</b> %s\n", esc(req.ReferenceLink))
+	}
+	if lyrics := strings.TrimSpace(req.Lyrics); lyrics != "" {
+		runes := []rune(lyrics)
+		if len(runes) > telegramLyricsPreview {
+			lyrics = strings.TrimSpace(string(runes[:telegramLyricsPreview])) + "…"
+		}
+		fmt.Fprintf(&b, "\n<pre>%s</pre>\n", esc(lyrics))
+	}
+	if clientURL != "" {
+		fmt.Fprintf(&b, "\n%s/dashboard/song-requests", esc(clientURL))
+	}
+	return b.String()
 }
 
 // SaveDeviceToken upserts a device token for a user.

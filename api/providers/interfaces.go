@@ -15,6 +15,11 @@ type EmbedderIface interface {
 	Embed(ctx context.Context, inputs []string) ([][]float32, error)
 }
 
+// TelegramIface abstracts TelegramBot (admin alerts to a Telegram chat) for testing.
+type TelegramIface interface {
+	SendMessage(ctx context.Context, htmlText string) error
+}
+
 // PageFetcherIface abstracts PageFetcher (outbound fetch of user-supplied links) for testing.
 type PageFetcherIface interface {
 	Fetch(ctx context.Context, rawURL string) (*FetchedPage, error)

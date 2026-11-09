@@ -89,7 +89,7 @@ func buildApp() (*fiber.App, error) {
 	auditSvc := services.NewAuditService(auditRepo)
 
 	notifRepo := repositories.NewNotificationRepository(ctx.DB)
-	notifSvc := services.NewNotificationService(ctx.Push, notifRepo)
+	notifSvc := services.NewNotificationService(ctx.Push, notifRepo, providers.NewTelegramFromEnv(), ctx.ClientURL)
 
 	invitationRepo := repositories.NewInvitationRepository(ctx.DB)
 	invitationSvc := services.NewInvitationService(invitationRepo, playlistRepo, teamRepo, userRepo, notifSvc)

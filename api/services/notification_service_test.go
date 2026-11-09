@@ -2,8 +2,11 @@ package services
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
+	"be-songbanks-v1/api/models"
 	"be-songbanks-v1/api/repositories"
 	"be-songbanks-v1/api/services/mocks"
 	"github.com/stretchr/testify/assert"
@@ -128,4 +131,68 @@ func TestNotificationService_NotifyMemberLeft_ZeroOwnerID_Skips(t *testing.T) {
 	svc := &NotificationService{repo: mockRepo, push: &mocks.PushProvider{}}
 	svc.NotifyMemberLeft("Sunday Set", "Alice", 0) // ownerID=0 → skip
 	assert.False(t, saveCalled, "must not save when ownerID is 0")
+}
+
+// ── NotifySongRequest ─────────────────────────────────────────────────────────
+
+func TestNotificationService_NotifySongRequest_SendsEscapedAlert(t *testing.T) {
+	var sent string
+	tg := &mocks.Telegram{
+		SendMessageFn: func(ctx context.Context, text string) error {
+			_, hasDeadline := ctx.Deadline()
+			assert.True(t, hasDeadline, "Telegram call must carry a timeout")
+			sent = text
+			return nil
+		},
+	}
+	svc := &NotificationService{telegram: tg, clientURL: "https://admin.example.com"}
+	svc.NotifySongRequest(&models.SongRequest{
+		ID:            7,
+		UserID:        5,
+		SongTitle:     "Holy <Spirit> & Fire",
+		ReferenceLink: "https://example.com/song?a=1&b=2",
+		LyricsType:    "lyrics_chords",
+		Lyrics:        strings.Repeat("ab", 200),
+	}, "kris")
+
+	assert.Contains(t, sent, "<b>Title:</b> Holy &lt;Spirit&gt; &amp; Fire")
+	assert.Contains(t, sent, "<b>From:</b> kris (user #5)")
+	assert.Contains(t, sent, "<b>Type:</b> Lyrics + chords")
+	assert.Contains(t, sent, "https://example.com/song?a=1&amp;b=2")
+	assert.Contains(t, sent, strings.Repeat("ab", 150)+"…</pre>")
+	assert.NotContains(t, sent, strings.Repeat("ab", 151))
+	assert.Contains(t, sent, "https://admin.example.com/dashboard/song-requests")
+}
+
+func TestNotificationService_NotifySongRequest_NoLinkNoLyricsLines(t *testing.T) {
+	var sent string
+	tg := &mocks.Telegram{SendMessageFn: func(_ context.Context, text string) error { sent = text; return nil }}
+	svc := &NotificationService{telegram: tg}
+	svc.NotifySongRequest(&models.SongRequest{SongTitle: "Song", LyricsType: "lyrics"}, "")
+
+	assert.Contains(t, sent, "<b>From:</b> unknown")
+	assert.Contains(t, sent, "<b>Type:</b> Lyrics\n")
+	assert.NotContains(t, sent, "<b>Link:</b>")
+	assert.NotContains(t, sent, "<pre>")
+	assert.NotContains(t, sent, "/dashboard/song-requests")
+}
+
+func TestNotificationService_NotifySongRequest_TelegramDisabled_Skips(t *testing.T) {
+	svc := &NotificationService{} // telegram nil
+	assert.NotPanics(t, func() {
+		svc.NotifySongRequest(&models.SongRequest{SongTitle: "Song"}, "kris")
+	})
+}
+
+func TestNotificationService_NotifySongRequest_SendError_DoesNotPanic(t *testing.T) {
+	called := false
+	tg := &mocks.Telegram{SendMessageFn: func(context.Context, string) error {
+		called = true
+		return errors.New("telegram sendMessage: status 400: chat not found")
+	}}
+	svc := &NotificationService{telegram: tg}
+	assert.NotPanics(t, func() {
+		svc.NotifySongRequest(&models.SongRequest{SongTitle: "Song"}, "kris")
+	})
+	assert.True(t, called)
 }

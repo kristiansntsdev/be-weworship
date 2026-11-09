@@ -1084,6 +1084,19 @@ func (m *PushProvider) Send(ctx context.Context, tokens []string, title, body st
 	return nil
 }
 
+// ── Telegram ──────────────────────────────────────────────────────────────────
+
+type Telegram struct {
+	SendMessageFn func(context.Context, string) error
+}
+
+func (m *Telegram) SendMessage(ctx context.Context, htmlText string) error {
+	if m.SendMessageFn != nil {
+		return m.SendMessageFn(ctx, htmlText)
+	}
+	return nil
+}
+
 // ── EmbeddingRepo ─────────────────────────────────────────────────────────────
 
 type EmbeddingRepo struct {

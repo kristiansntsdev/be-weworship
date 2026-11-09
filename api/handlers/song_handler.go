@@ -488,6 +488,11 @@ func (h *Handler) RequestSong(c *fiber.Ctx) error {
 		}
 		return utils.FailErr(c, 500, "Failed to submit song request", err)
 	}
+	requester := cl.Username
+	if requester == "" {
+		requester = cl.Email
+	}
+	h.notifications.NotifySongRequest(result, requester)
 	return utils.OK(c, 201, "Song request submitted successfully", result)
 }
 
