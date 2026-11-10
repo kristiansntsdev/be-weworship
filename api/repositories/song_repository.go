@@ -359,7 +359,7 @@ func (r *SongRepository) ListSongRequests(status string, page, limit int) ([]mod
 	args := []any{}
 
 	if status != "" {
-		where = "status = $1"
+		where = "status = ?"
 		args = append(args, status)
 	}
 
@@ -470,7 +470,7 @@ func (r *SongRepository) ListSongReports(status string, page, limit int) ([]mode
 	args := []any{}
 
 	if status != "" {
-		where = "sr.status = $1"
+		where = "sr.status = ?"
 		args = append(args, status)
 	}
 
