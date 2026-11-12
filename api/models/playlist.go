@@ -15,6 +15,8 @@ type Playlist struct {
 	IsShared         bool           `db:"is_shared"`
 	IsLocked         bool           `db:"is_locked"`
 	IsPublic         bool           `db:"is_public"`
+	PublicToken      sql.NullString `db:"public_token"`
+	PublicViewMode   string         `db:"public_view_mode"`
 	CreatedAt        time.Time      `db:"createdAt"`
 	UpdatedAt        time.Time      `db:"updatedAt"`
 	SongsRaw         sql.NullString `db:"songs"`

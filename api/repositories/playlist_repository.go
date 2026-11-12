@@ -110,7 +110,30 @@ func (r *PlaylistRepository) ListAccessible(userID, page, limit int) ([]models.P
 
 func (r *PlaylistRepository) GetByID(playlistID int) (*models.Playlist, error) {
 	var pl models.Playlist
-	err := r.db.Get(&pl, r.db.Rebind(`SELECT id,playlist_name,sharable_link,share_token,user_id,playlist_team_id,is_shared,is_locked,is_public,"createdAt","updatedAt",songs,playlist_notes FROM playlists WHERE id=?`), playlistID)
+	err := r.db.Get(&pl, r.db.Rebind(`SELECT id,playlist_name,sharable_link,share_token,user_id,playlist_team_id,is_shared,is_locked,is_public,public_token,public_view_mode,"createdAt","updatedAt",songs,playlist_notes FROM playlists WHERE id=?`), playlistID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &pl, nil
+}
+
+// Publish makes the playlist public with the given display mode. The token is only assigned the first time, so
+// republishing (or switching mode) keeps the same link. Owner-only: the user_id filter makes it a no-op otherwise.
+func (r *PlaylistRepository) Publish(playlistID, userID int, token, viewMode string) (int64, error) {
+	res, err := r.db.Exec(r.db.Rebind(`UPDATE playlists SET is_public=1,public_view_mode=?,public_token=COALESCE(public_token,?),"updatedAt"=NOW() WHERE id=? AND user_id=?`), viewMode, token, playlistID, userID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// GetPublishedByToken returns a playlist by its public token, only while it is public. Nil when unpublished or unknown.
+func (r *PlaylistRepository) GetPublishedByToken(token string) (*models.Playlist, error) {
+	var pl models.Playlist
+	err := r.db.Get(&pl, r.db.Rebind(`SELECT id,playlist_name,user_id,is_public,public_token,public_view_mode,"createdAt","updatedAt",songs FROM playlists WHERE public_token=? AND is_public=1`), token)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

@@ -101,6 +101,35 @@ func (h *Handler) UpdatePlaylistVisibility(c *fiber.Ctx) error {
 	return utils.OK(c, 200, "Playlist visibility updated", fiber.Map{"id": id, "is_public": *req.IsPublic})
 }
 
+// PublishPlaylist makes the caller's playlist readable on the web at its public link, in lyrics-only or lyrics+chords mode.
+func (h *Handler) PublishPlaylist(c *fiber.Ctx) error {
+	cl := middleware.GetClaims(c)
+	id, err := parseID(c, "id")
+	if err != nil {
+		return utils.Fail(c, 400, "Invalid playlist ID")
+	}
+	var req struct {
+		ViewMode string `json:"view_mode"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.Fail(c, 400, "Invalid JSON")
+	}
+	data, status, err := h.playlists.Publish(id, cl.UserID, req.ViewMode)
+	if err != nil {
+		return utils.FailErr(c, status, err.Error(), err)
+	}
+	return utils.OK(c, 200, "Playlist published", data)
+}
+
+// GetPublishedPlaylist serves a published playlist to anyone with its public token (no sign-in).
+func (h *Handler) GetPublishedPlaylist(c *fiber.Ctx) error {
+	data, status, err := h.playlists.GetPublished(c.Params("token"))
+	if err != nil {
+		return utils.FailErr(c, status, err.Error(), err)
+	}
+	return utils.OK(c, 200, "Published playlist", data)
+}
+
 // CopyPlaylist saves a private copy of a playlist the caller can read, e.g. someone's public playlist.
 func (h *Handler) CopyPlaylist(c *fiber.Ctx) error {
 	cl := middleware.GetClaims(c)

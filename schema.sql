@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS playlists (
     is_shared        SMALLINT      NOT NULL DEFAULT 0,
     is_locked        SMALLINT      NOT NULL DEFAULT 0,
     is_public        SMALLINT      NOT NULL DEFAULT 0,
+    public_token     VARCHAR(32),
+    public_view_mode VARCHAR(16)   NOT NULL DEFAULT 'lyrics_chords',
     "createdAt"      TIMESTAMP     NOT NULL DEFAULT NOW(),
     "updatedAt"      TIMESTAMP     NOT NULL DEFAULT NOW()
 );
@@ -165,6 +167,7 @@ CREATE INDEX IF NOT EXISTS idx_verification_requests_user_id ON verification_req
 CREATE INDEX IF NOT EXISTS idx_verification_requests_status ON verification_requests (status);
 CREATE INDEX IF NOT EXISTS idx_playlists_user_id        ON playlists(user_id);
 CREATE INDEX IF NOT EXISTS idx_playlists_share_token    ON playlists(share_token);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_playlists_public_token ON playlists(public_token);
 CREATE INDEX IF NOT EXISTS idx_playlist_teams_playlist  ON playlist_teams(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_playlist_teams_lead      ON playlist_teams(lead_id);
 CREATE INDEX IF NOT EXISTS idx_playlist_members_playlist ON playlist_members(playlist_id);

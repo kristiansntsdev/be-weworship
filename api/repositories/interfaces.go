@@ -70,6 +70,8 @@ type PlaylistRepoIface interface {
 	CountAccessible(userID int) (int, error)
 	ListAccessible(userID, page, limit int) ([]models.PlaylistListRow, error)
 	GetByID(playlistID int) (*models.Playlist, error)
+	Publish(playlistID, userID int, token, viewMode string) (int64, error)
+	GetPublishedByToken(token string) (*models.Playlist, error)
 	UpdateName(playlistID, userID int, name string) (int64, error)
 	Delete(playlistID, userID int) (int64, error)
 	UpdateShare(playlistID int, link, token string, teamID int64) error

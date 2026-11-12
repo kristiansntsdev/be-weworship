@@ -303,6 +303,21 @@ type PlaylistRepo struct {
 	DeleteSongKeyFn            func(int, int) error
 	GetOwnerFn                 func(int) (*repositories.PlaylistOwner, error)
 	CopySongKeysFn             func(int, int) error
+	PublishFn                  func(int, int, string, string) (int64, error)
+	GetPublishedByTokenFn      func(string) (*models.Playlist, error)
+}
+
+func (m *PlaylistRepo) Publish(playlistID, userID int, token, viewMode string) (int64, error) {
+	if m.PublishFn != nil {
+		return m.PublishFn(playlistID, userID, token, viewMode)
+	}
+	return 0, nil
+}
+func (m *PlaylistRepo) GetPublishedByToken(token string) (*models.Playlist, error) {
+	if m.GetPublishedByTokenFn != nil {
+		return m.GetPublishedByTokenFn(token)
+	}
+	return nil, nil
 }
 
 func (m *PlaylistRepo) RecordShareEvent(playlistID int) {

@@ -112,6 +112,8 @@ func (h *Handler) Register(app *fiber.App) {
 	api.Get("/playlists/:id", ra, h.GetPlaylistByID)
 	api.Put("/playlists/:id", ra, h.UpdatePlaylist)
 	api.Put("/playlists/:id/visibility", ra, h.UpdatePlaylistVisibility)
+	api.Put("/playlists/:id/publish", ra, h.PublishPlaylist)
+	api.Get("/playlists/public/:token", h.GetPublishedPlaylist)
 	api.Post("/playlists/:id/copy", ra, h.CopyPlaylist)
 	api.Delete("/playlists/:id", ra, h.DeletePlaylist)
 	api.Post("/playlists/:id/sharelink", ra, h.GenerateSharelink)

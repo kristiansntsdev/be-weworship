@@ -72,6 +72,111 @@ func (s *PlaylistService) UpdateVisibility(playlistID, userID int, isPublic bool
 	return 200, nil
 }
 
+const (
+	viewModeLyrics       = "lyrics"
+	viewModeLyricsChords = "lyrics_chords"
+)
+
+// Publish makes a playlist public and readable at /p/<public_token> in the chosen display mode. The token is created
+// on first publish and kept afterwards, so republishing or switching mode never changes the link. Owner only.
+func (s *PlaylistService) Publish(playlistID, userID int, viewMode string) (map[string]any, int, error) {
+	if viewMode != viewModeLyrics && viewMode != viewModeLyricsChords {
+		return nil, 400, fmt.Errorf("view_mode must be %q or %q", viewModeLyrics, viewModeLyricsChords)
+	}
+	token, err := utils.RandomToken(12)
+	if err != nil {
+		return nil, 500, err
+	}
+	affected, err := s.playlists.Publish(playlistID, userID, token, viewMode)
+	if err != nil {
+		return nil, 500, err
+	}
+	if affected == 0 {
+		return nil, 404, fmt.Errorf("playlist not found")
+	}
+	pl, err := s.playlists.GetByID(playlistID)
+	if err != nil {
+		return nil, 500, err
+	}
+	if pl == nil {
+		return nil, 404, fmt.Errorf("playlist not found")
+	}
+	return map[string]any{"id": playlistID, "is_public": true, "public_token": utils.NullableString(pl.PublicToken), "public_view_mode": pl.PublicViewMode}, 200, nil
+}
+
+// GetPublished is the signed-out read of a published playlist: songs in order with the key chosen for this playlist.
+// In lyrics-only mode chords are removed here, so they never leave the server. Songs under a DMCA takedown keep
+// their title but carry no lyrics.
+func (s *PlaylistService) GetPublished(token string) (map[string]any, int, error) {
+	pl, err := s.playlists.GetPublishedByToken(token)
+	if err != nil {
+		return nil, 500, err
+	}
+	if pl == nil {
+		return nil, 404, fmt.Errorf("playlist is not published")
+	}
+	ids := utils.ParseIntSlice(pl.SongsRaw.String)
+	songKeys, _ := s.playlists.GetSongKeys(pl.ID)
+
+	byID := map[int]models.Song{}
+	if len(ids) > 0 {
+		rows, err := s.songs.ListByIDs(ids)
+		if err != nil {
+			return nil, 500, err
+		}
+		for _, r := range rows {
+			byID[r.ID] = r
+		}
+	}
+
+	lyricsOnly := pl.PublicViewMode == viewModeLyrics
+	songs := make([]map[string]any, 0, len(ids))
+	for _, id := range ids {
+		row, ok := byID[id]
+		if !ok {
+			continue
+		}
+		key := songKeys[id]
+		if key == "" {
+			key = row.BaseChord.String
+		}
+		item := map[string]any{
+			"id":     row.ID,
+			"title":  row.Title,
+			"artist": utils.ParseArtists(row.Artist.String),
+			"key":    nil,
+			// The lyrics are written in the song's own key; the page transposes from it to "key".
+			"original_key": utils.NullableString(row.BaseChord),
+		}
+		if key != "" {
+			item["key"] = key
+		}
+		if row.DmcaTakedown {
+			item["lyrics_and_chords"] = nil
+			item["unavailable"] = true
+		} else {
+			lyrics := row.LyricsAndChord.String
+			if lyricsOnly {
+				lyrics = utils.StripChords(lyrics)
+			}
+			item["lyrics_and_chords"] = lyrics
+		}
+		songs = append(songs, item)
+	}
+
+	resp := map[string]any{
+		"playlist_name": pl.PlaylistName,
+		"view_mode":     pl.PublicViewMode,
+		"song_count":    len(songs),
+		"updatedAt":     pl.UpdatedAt,
+		"songs":         songs,
+	}
+	if owner, err := s.playlists.GetOwner(pl.UserID); err == nil && owner != nil {
+		resp["owner"] = map[string]any{"username": owner.Username, "display_name": owner.DisplayName, "verified": owner.Verified}
+	}
+	return resp, 200, nil
+}
+
 func (s *PlaylistService) List(userID, page, limit int) ([]map[string]any, map[string]any, error) {
 	total, err := s.playlists.CountAccessible(userID)
 	if err != nil {
@@ -116,6 +221,10 @@ func (s *PlaylistService) GetByIDWithAccess(playlistID, userID int) (map[string]
 	resp := map[string]any{"id": pl.ID, "playlist_name": pl.PlaylistName, "user_id": pl.UserID, "songs": songIDs, "song_keys": songKeysOut, "playlist_notes": utils.ParseAnyJSON(pl.PlaylistNotesRaw.String), "is_public": pl.IsPublic, "createdAt": pl.CreatedAt, "updatedAt": pl.UpdatedAt, "access_type": access}
 	if owner, err := s.playlists.GetOwner(pl.UserID); err == nil && owner != nil {
 		resp["owner"] = map[string]any{"username": owner.Username, "display_name": owner.DisplayName, "verified": owner.Verified}
+	}
+	if access == "owner" {
+		resp["public_token"] = utils.NullableString(pl.PublicToken)
+		resp["public_view_mode"] = pl.PublicViewMode
 	}
 	// A viewer reads a public playlist without being on its team: the share token would let them join the team.
 	if pl.IsShared && access != "viewer" {

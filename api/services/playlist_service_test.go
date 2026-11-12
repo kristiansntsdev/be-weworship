@@ -389,3 +389,78 @@ func TestPlaylistService_GetViewerRole_Unauthenticated(t *testing.T) {
 	assert.Equal(t, "guest", role)
 	assert.False(t, getMemberCalled, "GetMember must NOT be called for unauthenticated requests")
 }
+
+// ── Publish / GetPublished ────────────────────────────────────────────────────
+
+func TestPlaylistService_Publish_InvalidMode(t *testing.T) {
+	svc := &PlaylistService{playlists: &mocks.PlaylistRepo{}, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
+	_, status, err := svc.Publish(1, 1, "everything")
+	require.Error(t, err)
+	assert.Equal(t, 400, status)
+}
+
+func TestPlaylistService_Publish_NotOwner(t *testing.T) {
+	mockPlaylists := &mocks.PlaylistRepo{
+		PublishFn: func(int, int, string, string) (int64, error) { return 0, nil },
+	}
+	svc := &PlaylistService{playlists: mockPlaylists, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
+	_, status, err := svc.Publish(1, 2, "lyrics")
+	require.Error(t, err)
+	assert.Equal(t, 404, status)
+}
+
+func TestPlaylistService_Publish_Success(t *testing.T) {
+	mockPlaylists := &mocks.PlaylistRepo{
+		PublishFn: func(_, _ int, token, mode string) (int64, error) {
+			assert.Len(t, token, 12)
+			assert.Equal(t, "lyrics", mode)
+			return 1, nil
+		},
+		GetByIDFn: func(int) (*models.Playlist, error) {
+			return &models.Playlist{ID: 1, PublicToken: sql.NullString{String: "abc123abc123", Valid: true}, PublicViewMode: "lyrics"}, nil
+		},
+	}
+	svc := &PlaylistService{playlists: mockPlaylists, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
+	data, status, err := svc.Publish(1, 1, "lyrics")
+	require.NoError(t, err)
+	assert.Equal(t, 200, status)
+	assert.Equal(t, true, data["is_public"])
+	assert.Equal(t, "abc123abc123", data["public_token"])
+	assert.Equal(t, "lyrics", data["public_view_mode"])
+}
+
+func TestPlaylistService_GetPublished_Unpublished(t *testing.T) {
+	svc := &PlaylistService{playlists: &mocks.PlaylistRepo{}, teams: &mocks.TeamRepo{}, songs: &mocks.SongRepo{}}
+	_, status, err := svc.GetPublished("nope")
+	require.Error(t, err)
+	assert.Equal(t, 404, status)
+}
+
+func TestPlaylistService_GetPublished_StripsChordsAndHidesTakedowns(t *testing.T) {
+	mockPlaylists := &mocks.PlaylistRepo{
+		GetPublishedByTokenFn: func(string) (*models.Playlist, error) {
+			return &models.Playlist{ID: 5, PlaylistName: "Set", UserID: 9, SongsRaw: sql.NullString{String: "[2,1]", Valid: true}, PublicViewMode: "lyrics"}, nil
+		},
+		GetSongKeysFn: func(int) (map[int]string, error) { return map[int]string{1: "D"}, nil },
+	}
+	mockSongs := &mocks.SongRepo{
+		ListByIDsFn: func([]int) ([]models.Song, error) {
+			return []models.Song{
+				{ID: 1, Title: "One", BaseChord: sql.NullString{String: "C", Valid: true}, LyricsAndChord: sql.NullString{String: "[C]Hello [G]world", Valid: true}},
+				{ID: 2, Title: "Two", DmcaTakedown: true, LyricsAndChord: sql.NullString{String: "[C]secret", Valid: true}},
+			}, nil
+		},
+	}
+	svc := &PlaylistService{playlists: mockPlaylists, teams: &mocks.TeamRepo{}, songs: mockSongs}
+	data, status, err := svc.GetPublished("tok")
+	require.NoError(t, err)
+	assert.Equal(t, 200, status)
+
+	songs := data["songs"].([]map[string]any)
+	require.Len(t, songs, 2)
+	assert.Equal(t, 2, songs[0]["id"], "playlist order is kept")
+	assert.Nil(t, songs[0]["lyrics_and_chords"])
+	assert.Equal(t, true, songs[0]["unavailable"])
+	assert.Equal(t, "Hello world", songs[1]["lyrics_and_chords"])
+	assert.Equal(t, "D", songs[1]["key"], "per-playlist key wins over the song's own key")
+}
